@@ -11,10 +11,27 @@
   "dependencies": {
     "@formkit/auto-animate": "^0.8.1",
     "@phosphor-icons/vue": "^2.1.6",
-    "vue": "^3.3.8"
+    "@vueuse/core": "^14.2.1",
+    "canvas-confetti": "^1.9.4",
+    "date-fns": "^4.1.0",
+    "html2canvas": "^1.4.1",
+    "lz-string": "^1.5.0",
+    "reka-ui": "^2.9.3",
+    "vue": "^3.3.8",
+    "vue-sonner": "^2.0.9"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
     "@vitejs/plugin-vue": "^4.5.0",
+    "autoprefixer": "^10.4.27",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-vue-next": "^1.0.0",
+    "postcss": "^8.5.8",
+    "radix-vue": "^1.9.17",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.2",
+    "tailwindcss-animate": "^1.0.7",
     "vite": "^5.0.0"
   }
 }
