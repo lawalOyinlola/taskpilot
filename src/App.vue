@@ -1,19 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useDark, useToggle } from "@vueuse/core";
-import {
-  format,
-  addDays,
-  isPast,
-  endOfDay,
-  parseISO,
-  isToday,
-} from "date-fns";
-import {
-  CalendarDate,
-  today,
-  getLocalTimeZone,
-} from "@internationalized/date";
+import { format, addDays, isPast, endOfDay, parseISO, isToday } from "date-fns";
+import { CalendarDate, today, getLocalTimeZone } from "@internationalized/date";
 import {
   PhPencilSimpleLine,
   PhTrash,
@@ -28,6 +17,7 @@ import {
   PhCheckCircle,
   PhMoon,
   PhSun,
+  PhX,
 } from "@phosphor-icons/vue";
 import autoAnimate from "@formkit/auto-animate";
 import html2canvas from "html2canvas";
@@ -81,11 +71,15 @@ import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
-  InputGroupInput,
   InputGroupTextarea,
 } from "@/components/ui/input-group";
 import { PhCalendarBlank, PhPaperPlaneRight } from "@phosphor-icons/vue";
-import { SearchIcon } from "lucide-vue-next";
+import { ArrowDownUpIcon } from "lucide-vue-next";
+
+// Directives
+const vFocus = {
+  mounted: (el) => el.focus(),
+};
 
 // References for DOM elements
 const taskListRef = ref(null);
@@ -93,7 +87,7 @@ const newTodoInput = ref("");
 const newTodoPriority = ref(null);
 const newTodoCategory = ref(null);
 const newTodoDueDate = ref(null);
-const currentFilter = ref("active");
+const currentFilter = ref("all");
 const currentCategory = ref("All");
 const searchableTasks = computed(() => {
   return tasks.value.filter(
@@ -138,9 +132,11 @@ const filteredTasks = computed(() => {
   }
 
   if (currentFilter.value === "active") {
-    result = result.filter((t) => !t.isCompleted);
+    result = result.filter((t) => !t.isCompleted && !isTaskExpired(t));
   } else if (currentFilter.value === "completed") {
     result = result.filter((t) => t.isCompleted);
+  } else if (currentFilter.value === "expired") {
+    result = result.filter((t) => isTaskExpired(t));
   }
 
   if (searchQuery.value.trim()) {
@@ -230,6 +226,22 @@ const loadTasks = () => {
 };
 
 // Actions
+const startEditing = (task) => {
+  task._originalName = task.name;
+  task.isEditing = true;
+};
+
+const saveEdit = (task) => {
+  if (!task.isEditing) return;
+  task.isEditing = false;
+  saveTasks();
+};
+
+const cancelEdit = (task) => {
+  if (task._originalName) task.name = task._originalName;
+  task.isEditing = false;
+};
+
 const addTask = () => {
   if (!newTodoInput.value.trim()) return;
 
@@ -417,38 +429,31 @@ watch(tasks, saveTasks, { deep: true });
       class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
     >
       <div class="max-w-5xl mx-auto">
-        <header class="mb-12 text-center relative">
-          <div class="absolute right-0 top-0">
-            <Button
-              variant="outline"
-              size="icon"
-              @click="toggleDark()"
-              class="rounded-full border-outline-variant/20 bg-surface-container-highest/50 backdrop-blur-sm hover:bg-surface-container-highest transition-all duration-300 shadow-lg"
-            >
-              <ph-moon v-if="isDark" :size="20" class="text-primary" weight="fill" />
-              <ph-sun v-else :size="20" class="text-accent" weight="fill" />
-            </Button>
-          </div>
-          <div class="flex items-center justify-center gap-4 mb-2">
-            <div
-              class="bg-primary p-3 rounded-xl font-headings font-extrabold text-2xl shadow-lg shadow-primary/20 transition-transform duration-500 hover:rotate-6 text-primary-foreground"
-            >
-              TP
+        <header class="mb-12 relative flex justify-between items-start gap-4">
+          <div class="flex flex-col mr-auto">
+            <div class="flex items-center justify-start gap-4 mb-2">
+              <div
+                class="bg-primary p-3 rounded-xl font-headings font-extrabold text-2xl shadow-lg shadow-primary/20 transition-transform duration-500 hover:rotate-6 text-primary-foreground"
+              >
+                TP
+              </div>
+              <h1
+                class="text-4xl md:text-5xl font-headings font-extrabold tracking-tighter text-foreground"
+              >
+                TASK PILOT
+              </h1>
             </div>
-            <h1
-              class="text-4xl md:text-5xl font-headings font-extrabold tracking-tighter text-foreground"
+            <p
+              class="text-muted-foreground font-headings font-bold uppercase tracking-[0.3em] text-[10px] opacity-60"
             >
-              TASK PILOT
-            </h1>
+              Automated Productivity Navigation // V4.0
+            </p>
           </div>
-          <p class="text-muted-foreground font-headings font-bold uppercase tracking-[0.3em] text-[10px] opacity-60">
-            Automated Productivity Navigation // V4.0
-          </p>
 
           <!-- Global Search -->
-          <div class="mt-8 max-w-md mx-auto relative group">
+          <div class="max-w-2xl relative group">
             <div
-              class="absolute inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
+              class="absolute z-10 inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
             >
               <ph-circles-three-plus :size="20" />
             </div>
@@ -456,15 +461,33 @@ watch(tasks, saveTasks, { deep: true });
             <Input
               v-model="searchQuery"
               placeholder="Search missions..."
-              class="pl-12 h-12 bg-surface-container-high/50 border-outline-variant/10 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold"
+              class="pl-12 h-10.5 w-xs bg-surface-container-high/50 border-outline-variant/10 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold placeholder:text-muted-foreground/40! caret-primary"
             />
           </div>
+
+          <Button
+            variant="outline"
+            size="icon"
+            @click="toggleDark()"
+            class="rounded-full border-outline-variant/20 bg-surface-container-highest/50 backdrop-blur-sm hover:bg-surface-container-highest transition-all duration-300 shadow-lg"
+          >
+            <ph-moon
+              v-if="isDark"
+              :size="20"
+              class="text-primary"
+              weight="fill"
+            />
+            <ph-sun v-else :size="20" class="text-accent" weight="fill" />
+          </Button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          <!-- Sidebar (Layer 0: Surface Container Low) -->
+          <!-- Sidebar -->
           <aside class="space-y-6">
-            <Card class="bg-surface-container-low border-none shadow-none overflow-hidden">
+            <!-- CATEGORY CARD -->
+            <Card
+              class="bg-surface-container-low border-none shadow-none overflow-hidden"
+            >
               <CardHeader class="pb-2">
                 <CardTitle
                   class="text-[10px] font-headings font-black uppercase tracking-[0.2em] text-primary/60"
@@ -500,6 +523,7 @@ watch(tasks, saveTasks, { deep: true });
               </CardContent>
             </Card>
 
+            <!-- MISION PROGRESS CARD -->
             <Card class="bg-surface-container-low border-none shadow-none">
               <CardHeader class="pb-2">
                 <CardTitle
@@ -526,10 +550,12 @@ watch(tasks, saveTasks, { deep: true });
             </Card>
           </aside>
 
-          <!-- Main Content (Layer 2: Surface Container High) -->
+          <!-- Main Content -->
           <main class="space-y-6">
-            <!-- Deployment Module -->
-            <Card class="bg-surface-container-high border-none shadow-2xl overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500">
+            <!-- ADD TASK -->
+            <Card
+              class="border-none shadow-2xl overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
+            >
               <CardContent class="p-6">
                 <div class="space-y-4">
                   <InputGroup
@@ -537,8 +563,8 @@ watch(tasks, saveTasks, { deep: true });
                   >
                     <InputGroupTextarea
                       v-model="newTodoInput"
-                      placeholder="Input mission coordinates..."
-                      class="text-lg font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5"
+                      placeholder="What's the next mission?"
+                      class="text-base font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5 min-h-20"
                     />
 
                     <InputGroupAddon
@@ -569,6 +595,11 @@ watch(tasks, saveTasks, { deep: true });
                                   )
                                 "
                               />
+                              <ArrowDownUpIcon
+                                :size="12"
+                                class="text-primary"
+                                v-if="!newTodoPriority"
+                              />
                               <SelectValue placeholder="Priority" />
                             </SelectTrigger>
                             <SelectContent
@@ -596,7 +627,11 @@ watch(tasks, saveTasks, { deep: true });
                               id="sector-select"
                               class="h-8 bg-surface-container-highest border border-outline-variant/10 hover:bg-surface-container-highest/80 text-[10px] font-headings font-black uppercase tracking-wider px-3 rounded-lg gap-2 text-foreground transition-all"
                             >
-                              <ph-circles-three-plus :size="12" class="text-primary" />
+                              <ph-circles-three-plus
+                                :size="12"
+                                class="text-primary"
+                              />
+
                               <SelectValue placeholder="Sector" />
                             </SelectTrigger>
                             <SelectContent
@@ -626,7 +661,7 @@ watch(tasks, saveTasks, { deep: true });
                               <Button
                                 id="date-trigger"
                                 variant="ghost"
-                                class="h-8 bg-surface-container-highest border border-outline-variant/10 hover:bg-surface-container-highest/80 text-[10px] font-headings font-black uppercase tracking-wider px-3 rounded-lg gap-2 text-foreground blur-none"
+                                class="h-8 bg-surface-container-highest border border-outline-variant/10 hover:bg-surface-container-highest/80 text-[10px] font-headings font-black uppercase tracking-wider px-3 rounded-lg gap-2 text-foreground blur-none hover:text-foreground"
                               >
                                 <ph-calendar-blank
                                   :size="14"
@@ -647,6 +682,7 @@ watch(tasks, saveTasks, { deep: true });
                                 class="bg-transparent border-none"
                                 v-model:placeholder="calendarPlaceholder"
                                 :model-value="newTodoDueDateValue"
+                                :min-value="today(getLocalTimeZone())"
                                 @update:model-value="handleDateUpdate"
                               />
                             </PopoverContent>
@@ -657,12 +693,11 @@ watch(tasks, saveTasks, { deep: true });
                       <!-- Launch Button -->
                       <InputGroupButton
                         @click="addTask"
-                        size="sm"
                         :disabled="!newTodoInput.trim()"
-                        class="h-9 px-4 bg-primary hover:bg-primary/80 text-primary-foreground font-black uppercase tracking-wider rounded-xl gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                        class="h-9! px-4! bg-primary hover:bg-primary/80 text-primary-foreground font-black uppercase tracking-wider rounded-lg gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
                       >
                         Launch
-                        <ph-paper-plane-right :size="14" weight="bold" />
+                        <ph-paper-plane-right :size="10" weight="bold" />
                       </InputGroupButton>
                     </InputGroupAddon>
                   </InputGroup>
@@ -676,31 +711,42 @@ watch(tasks, saveTasks, { deep: true });
               </CardContent>
             </Card>
 
-            <!-- Mission Hub (Task List) -->
-            <Card class="bg-surface-container-high border-none shadow-xl overflow-hidden min-h-[400px]">
-              <div ref="taskListRef" class="bg-surface-container-high">
+            <!-- TASK LIST -->
+            <Card
+              class="bg-surface-container-high/80 border-none shadow-xl overflow-hidden min-h-[400px] flex flex-col"
+            >
+              <div ref="taskListRef" class="flex flex-col grow">
                 <CardHeader
                   class="flex flex-row items-center justify-between pb-6"
                 >
-                  <CardTitle class="text-xl font-headings font-extrabold tracking-tight">
+                  <CardTitle
+                    class="text-xl font-headings font-extrabold tracking-tight"
+                  >
                     Mission Feed:
-                    <span class="text-primary ml-1"> {{ currentCategory }}</span>
+                    <span class="text-primary ml-1">
+                      {{ currentCategory }}</span
+                    >
                   </CardTitle>
                   <div
-                    class="flex bg-surface-container-highest/40 rounded-xl p-1 pointer-events-auto"
+                    class="flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 pointer-events-auto"
                   >
                     <Button
-                      v-for="filter in ['all', 'active', 'completed']"
+                      v-for="filter in [
+                        'all',
+                        'active',
+                        'completed',
+                        'expired',
+                      ]"
                       :key="filter"
                       variant="ghost"
                       size="sm"
                       @click="currentFilter = filter"
                       :class="
                         cn(
-                          'h-8 px-3 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
+                          'h-7.5 px-2.5 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
                           currentFilter === filter
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground shadow-lg shadow-primary/20 rounded-lg'
-                            : 'text-muted-foreground/60 hover:text-foreground',
+                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground rounded-lg'
+                            : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/20',
                         )
                       "
                     >
@@ -709,13 +755,13 @@ watch(tasks, saveTasks, { deep: true });
                   </div>
                 </CardHeader>
 
-                <CardContent class="p-6 pt-0">
+                <CardContent class="p-6 pt-0 mb-auto grow">
                   <div
                     v-if="filteredTasks.length === 0"
-                    class="flex flex-col items-center justify-center py-20 opacity-20 select-none"
+                    class="flex flex-col items-center justify-center py-16 opacity-20 select-none"
                   >
-                    <ph-list-checks :size="64" class="mb-4" />
-                    <p class="text-lg font-headings font-bold">
+                    <ph-list-checks :size="32" class="mb-4" />
+                    <p class="text-base font-headings font-bold">
                       RADAR CLEAR: NO TARGETS DETECTED
                     </p>
                   </div>
@@ -725,10 +771,10 @@ watch(tasks, saveTasks, { deep: true });
                     :key="task.id"
                     :class="
                       cn(
-                        'group p-4 transition-all duration-300 border-none hover:bg-surface-container-highest/60 rounded-2xl mb-2',
+                        'group p-4 transition-all duration-300 border-none hover:bg-surface-container-highest/40 rounded-xl mb-2',
                         task.isCompleted
-                          ? 'opacity-40'
-                          : 'bg-surface-container-highest/30 shadow-sm',
+                          ? 'opacity-50'
+                          : 'bg-surface-container-highest/60 shadow-xl',
                       )
                     "
                   >
@@ -740,13 +786,24 @@ watch(tasks, saveTasks, { deep: true });
                       />
                     </ItemMedia>
 
-                    <ItemContent>
+                    <ItemContent class="flex-1 w-full overflow-hidden">
                       <div class="flex items-center gap-3">
+                        <Textarea
+                          v-if="task.isEditing"
+                          v-focus
+                          v-model="task.name"
+                          @blur="saveEdit(task)"
+                          @keyup.enter="saveEdit(task)"
+                          @keyup.esc="cancelEdit(task)"
+                          class="w-full min-h-8 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar"
+                        />
                         <ItemTitle
+                          v-else
                           :class="
                             cn(
-                              'text-base font-headings font-bold transition-all duration-300 truncate text-foreground',
-                              task.isCompleted && 'line-through text-muted-foreground opacity-50',
+                              'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                              task.isCompleted &&
+                                'line-through text-muted-foreground opacity-50',
                             )
                           "
                         >
@@ -783,7 +840,13 @@ watch(tasks, saveTasks, { deep: true });
                             )
                           "
                         >
-                          {{ task.priority === 'med' ? 'Standard' : task.priority === 'high' ? 'Critical' : 'Routine' }}
+                          {{
+                            task.priority === "med"
+                              ? "Standard"
+                              : task.priority === "high"
+                                ? "Critical"
+                                : "Low"
+                          }}
                         </span>
                         <span
                           class="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight"
@@ -813,43 +876,100 @@ watch(tasks, saveTasks, { deep: true });
                       </ItemDescription>
                     </ItemContent>
 
-                    <ItemActions>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
-                            @click="deleteTodo(task)"
+                    <ItemActions class="flex items-center">
+                      <template v-if="task.isEditing">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
+                              @mousedown.prevent="saveEdit(task)"
+                            >
+                              <ph-check-circle :size="18" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
                           >
-                            <ph-trash :size="18" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent
-                          class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
-                        >
-                          Delete Task
-                        </TooltipContent>
-                      </Tooltip>
+                            Save Edit
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                              @mousedown.prevent="cancelEdit(task)"
+                            >
+                              <ph-x :size="18" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
+                          >
+                            Cancel
+                          </TooltipContent>
+                        </Tooltip>
+                      </template>
+                      <template v-else>
+                        <Tooltip v-if="!task.isCompleted">
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
+                              @click="startEditing(task)"
+                            >
+                              <ph-pencil-simple-line :size="18" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
+                          >
+                            Edit Task
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                              @click="deleteTodo(task)"
+                            >
+                              <ph-trash :size="18" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
+                          >
+                            Delete Task
+                          </TooltipContent>
+                        </Tooltip>
+                      </template>
                     </ItemActions>
                   </Item>
                 </CardContent>
 
                 <CardFooter
-                  class="flex items-center justify-between p-6 pt-2"
+                  class="flex items-center justify-between p-6 pt-4 mt-auto border-t border-border/5"
                 >
                   <div class="flex gap-2">
                     <Button
                       @click="generateShareUrl"
-                      class="bg-primary hover:bg-primary/80 text-primary-foreground font-headings font-black uppercase tracking-wider h-10 px-5 rounded-xl gap-2 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                      class="bg-primary hover:bg-primary/80 text-primary-foreground font-headings font-black uppercase tracking-wider h-9 px-5 rounded-lg gap-2 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
                       <ph-share-network :size="18" weight="bold" />
-                      Transmission
+                      Share Task
                     </Button>
                     <Button
                       variant="ghost"
                       @click="captureScreenshot"
-                      class="h-10 px-5 rounded-xl gap-2 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest border border-outline-variant/10 active:scale-95 transition-all font-headings font-black text-[10px] uppercase tracking-widest"
+                      class="h-9 px-5 rounded-lg gap-2 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest border border-outline-variant/10 active:scale-95 transition-all font-headings font-black text-[10px] uppercase tracking-widest"
                     >
                       <ph-camera :size="18" />
                       Visual Log
@@ -858,7 +978,7 @@ watch(tasks, saveTasks, { deep: true });
                   <Button
                     variant="ghost"
                     @click="clearAll"
-                    class="h-10 px-4 rounded-xl text-destructive font-headings font-black text-[10px] uppercase tracking-widest hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
+                    class="h-9 px-4 rounded-lg text-destructive font-headings font-black text-[10px] uppercase tracking-widest hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
                   >
                     Wipe Interface
                   </Button>
