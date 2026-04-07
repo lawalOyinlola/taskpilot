@@ -65,42 +65,43 @@
 
 @layer base {
   :root {
-    /* Morning Flight (Light Mode) */
-    --background: 225 100% 99%;
-    --foreground: 222 55% 10%;
-    --surface: 225 100% 99%;
-    --surface-container-low: 225 100% 97%;
-    --surface-container-high: 225 100% 94%;
-    --surface-container-highest: 225 100% 91%;
+    /* Aero Command (Professional Light Mode) */
+    --background: 210 40% 98%;    /* Slate-50 background for structure */
+    --foreground: 222 47% 11%;    /* Slate-950 for deep readability */
+    
+    --surface: 210 40% 98%;
+    --surface-container-low: 0 0% 100%;       /* Pure white cards */
+    --surface-container-high: 210 40% 96%;    /* Subtle contrast layering */
+    --surface-container-highest: 210 40% 93%; /* Action areas */
     
     --card: 0 0% 100%;
-    --card-foreground: 222 55% 10%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 55% 10%;
+    --popover-foreground: 222 47% 11%;
     
-    --primary: 201 100% 45%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 225 100% 94%;
-    --secondary-foreground: 222 55% 20%;
+    --primary: 221 83% 53%;       /* Professional Command Blue */
+    --primary-foreground: 210 40% 99%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
     
-    --tertiary: 172 70% 40%;
-    --tertiary-foreground: 0 0% 100%;
+    --tertiary: 160 84% 39%;      /* Tactical Green for success */
+    --tertiary-foreground: 210 40% 99%;
     
-    --muted: 225 100% 94%;
-    --muted-foreground: 222 20% 45%;
-    --accent: 201 100% 45%;
-    --accent-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 221 83% 53%;
+    --accent-foreground: 210 40% 99%;
     
     --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive-foreground: 210 40% 99%;
     
-    --border: 225 100% 90%;
-    --input: 225 100% 90%;
-    --outline-variant: 225 100% 85%;
-    --ring: 201 100% 45%;
+    --border: 214 32% 91%;        /* Slate-200 for clean separation */
+    --input: 214 32% 91%;
+    --outline-variant: 214 32% 88%;
+    --ring: 221 83% 53%;
     
-    --glass-background: rgba(255, 255, 255, 0.7);
-    --glass-border-color: rgba(0, 0, 0, 0.05);
+    --glass-background: rgba(255, 255, 255, 0.85);
+    --glass-border-color: rgba(203, 213, 225, 0.6);
   }
 
   .dark {

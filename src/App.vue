@@ -1,23 +1,26 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useDark, useToggle } from "@vueuse/core";
 import { format, addDays, isPast, endOfDay, parseISO, isToday } from "date-fns";
 import { CalendarDate, today, getLocalTimeZone } from "@internationalized/date";
 import {
   PhPencilSimpleLine,
   PhTrash,
-  PhPlus,
   PhShareNetwork,
   PhCamera,
-  PhInfo,
   PhListChecks,
-  PhFire,
-  PhCirclesThreePlus,
   PhClock,
   PhCheckCircle,
   PhMoon,
   PhSun,
   PhX,
+  PhMagnifyingGlass,
+  PhSquaresFour,
+  PhBriefcase,
+  PhUser,
+  PhRobot,
+  PhHeartbeat,
+  PhTag,
 } from "@phosphor-icons/vue";
 import autoAnimate from "@formkit/auto-animate";
 import html2canvas from "html2canvas";
@@ -106,17 +109,28 @@ const newTodoDueDateValue = computed(() => {
 });
 
 const searchQuery = ref("");
+const isSharing = ref(false);
+const lastDeletedTask = ref(null);
+const lastDeletedIndex = ref(-1);
+
+const truncate = (str, len = 50) =>
+  str.length > len ? str.slice(0, len) + "..." : str;
 
 // State
 const tasks = ref([]);
 const categories = [
-  "All",
-  "General",
-  "Work",
-  "Personal",
-  "Automation",
-  "Health",
+  { name: "All", icon: PhSquaresFour },
+  { name: "General", icon: PhTag },
+  { name: "Work", icon: PhBriefcase },
+  { name: "Personal", icon: PhUser },
+  { name: "Automation", icon: PhRobot },
+  { name: "Health", icon: PhHeartbeat },
 ];
+
+const getCategoryIcon = (categoryName) => {
+  const cat = categories.find((c) => c.name === categoryName);
+  return cat ? cat.icon : PhTag;
+};
 const priorities = [
   { id: "high", label: "High", class: "priority-high" },
   { id: "med", label: "Medium", class: "priority-med" },
@@ -125,7 +139,7 @@ const priorities = [
 
 // Computed
 const filteredTasks = computed(() => {
-  let result = tasks.value.filter((t) => !t.deleted);
+  let result = [...tasks.value];
 
   if (currentCategory.value !== "All") {
     result = result.filter((t) => t.category === currentCategory.value);
@@ -151,7 +165,7 @@ const filteredTasks = computed(() => {
 });
 
 const stats = computed(() => {
-  const active = tasks.value.filter((t) => !t.deleted);
+  const active = tasks.value;
   const completed = active.filter((t) => t.isCompleted).length;
   const total = active.length;
   const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -173,7 +187,6 @@ const loadTasks = () => {
       priority: t.priority ?? "med",
       category: t.category ?? "General",
       dueDate: t.dueDate ?? new Date().toISOString().split("T")[0],
-      deleted: t.deleted ?? false,
       isEditing: t.isEditing ?? false,
     }));
   } else {
@@ -187,7 +200,6 @@ const loadTasks = () => {
         category: "Automation",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -197,7 +209,6 @@ const loadTasks = () => {
         category: "Automation",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -207,7 +218,6 @@ const loadTasks = () => {
         category: "Health",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -217,7 +227,6 @@ const loadTasks = () => {
         category: "Work",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
     ];
@@ -235,6 +244,9 @@ const saveEdit = (task) => {
   if (!task.isEditing) return;
   task.isEditing = false;
   saveTasks();
+  toast.success("Mission Updated", {
+    description: `Directives for "${truncate(task.name)}" synchronized.`,
+  });
 };
 
 const cancelEdit = (task) => {
@@ -257,13 +269,12 @@ const addTask = () => {
         : newTodoCategory.value,
     dueDate: newTodoDueDate.value ?? defaultDate,
     isCompleted: false,
-    deleted: false,
     isEditing: false,
     createdAt: new Date().toISOString(),
   });
 
-  toast.success("Task Registered", {
-    description: "New objective added to your queue.",
+  toast.success("Mission Assigned", {
+    description: "New objective prioritized in your queue.",
   });
   newTodoInput.value = "";
   // Reset selection states to null to show placeholders
@@ -277,43 +288,54 @@ const toggleTodoStatus = (task) => {
   task.isCompleted = !task.isCompleted;
   saveTasks();
   if (task.isCompleted) {
-    toast.success("Objective Achieved", {
-      description: `Task "${task.name}" completed.`,
+    toast.success("Mission Accomplished", {
+      description: `Objective "${truncate(task.name)}" secured.`,
     });
   } else {
-    toast.info("Task Reactivated", {
-      description: `Task "${task.name}" is back in focus.`,
+    toast.info("Mission Resumed", {
+      description: `Task "${truncate(task.name)}" is back on the radar.`,
     });
   }
 };
 
 const deleteTodo = (task) => {
-  const originalState = task.deleted;
-  task.deleted = true;
+  const index = tasks.value.findIndex((t) => t.id === task.id);
+  if (index === -1) return;
+
+  lastDeletedTask.value = { ...tasks.value[index] };
+  lastDeletedIndex.value = index;
+
+  tasks.value.splice(index, 1);
   saveTasks();
-  toast.info("Task moved to archives", {
-    description: `Task: ${task.name}`,
+
+  toast.info("Mission Terminated", {
+    description: `Target removed: ${truncate(task.name)}`,
     action: {
       label: "Undo",
       onClick: () => {
-        task.deleted = originalState;
-        saveTasks();
+        if (lastDeletedTask.value) {
+          tasks.value.splice(lastDeletedIndex.value, 0, lastDeletedTask.value);
+          saveTasks();
+          lastDeletedTask.value = null;
+          lastDeletedIndex.value = -1;
+          toast.success("Mission Restored");
+        }
       },
     },
   });
 };
 
 const clearAll = () => {
-  if (tasks.value.filter((t) => !t.deleted).length === 0) return;
+  if (tasks.value.length === 0) return;
 
-  toast.warning("Clear the entire deck?", {
-    description: "This will archive all currently active tasks.",
+  toast.warning("Wipe entire interface?", {
+    description: "This will permanently terminate all active missions.",
     action: {
       label: "Confirm",
       onClick: () => {
-        tasks.value.forEach((t) => (t.deleted = true));
+        tasks.value = [];
         saveTasks();
-        toast.success("Deck cleared");
+        toast.success("Interface Purged");
       },
     },
   });
@@ -335,39 +357,95 @@ const getTaskStatus = (task) => {
 // Screenshot Logic
 const captureScreenshot = async () => {
   if (!taskListRef.value) return;
-  toast.info("Generating screenshot...");
-  await nextTick();
+  const toastId = toast.loading("Synthesizing Visual Log...");
+
   try {
+    // Advanced capture configuration to handle complex CSS
     const canvas = await html2canvas(taskListRef.value, {
-      backgroundColor: "#0f172a",
-      borderRadius: 24,
-      scale: 2,
-      logging: true,
+      backgroundColor: isDark.value ? "#0f172a" : "#f8fafc",
+      scale: 3,
+      logging: false,
       useCORS: true,
+      allowTaint: true,
+      // The secret sauce: sanitize the DOM clone before rendering
+      onclone: (clonedDoc) => {
+        const clonedElement =
+          clonedDoc.querySelector('[ref="taskListRef"]') ||
+          clonedDoc.body.querySelector(".flex.flex-col.grow");
+
+        if (clonedElement) {
+          // Remove problematic backdrop filters and transitions
+          const allElements = clonedElement.querySelectorAll("*");
+          allElements.forEach((el) => {
+            const style = window.getComputedStyle(el);
+            if (style.backdropFilter !== "none") {
+              el.style.backdropFilter = "none";
+              el.style.webkitBackdropFilter = "none";
+              // Fallback background for blurred elements
+              el.style.backgroundColor = isDark.value
+                ? "rgba(30, 41, 59, 0.8)"
+                : "rgba(255, 255, 255, 0.9)";
+            }
+            el.style.transition = "none";
+            el.style.animation = "none";
+          });
+        }
+      },
     });
+
     const link = document.createElement("a");
-    link.download = `taskpilot-snapshot-${new Date().toISOString().slice(0, 10)}.png`;
-    link.href = canvas.toDataURL();
+    link.download = `taskpilot-log-${new Date().getTime()}.png`;
+    link.href = canvas.toDataURL("image/png");
     link.click();
-    toast.success("Screenshot saved!");
+
+    toast.success("Log Decrypted & Saved", { id: toastId });
   } catch (err) {
-    console.error(err);
-    toast.error("Failed to capture screenshot");
+    console.error("Capture Error:", err);
+    toast.error("Visual Log Synthesis Failed", { id: toastId });
   }
 };
 
 // Sharing Logic
-const generateShareUrl = () => {
-  const activeTasks = tasks.value.filter((t) => !t.deleted);
+const generateShareUrl = async () => {
+  const activeTasks = tasks.value;
   const data = JSON.stringify(activeTasks);
   const compressed = LZString.compressToEncodedURIComponent(data);
   const url = new URL(window.location.href);
   url.searchParams.set("share", compressed);
+  const sharedUrl = url.toString();
 
-  navigator.clipboard.writeText(url.toString());
-  toast.success("Network Shared", {
-    description: "Shareable tasks link copied to clipboard.",
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ url: sharedUrl })
+  ) {
+    try {
+      await navigator.share({
+        title: "TaskPilot Mission List",
+        text: "Check out these operational objectives.",
+        url: sharedUrl,
+      });
+      toast.success("Network Synchronized");
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Share failed:", err);
+        copyToClipboard(sharedUrl);
+      }
+    }
+  } else {
+    copyToClipboard(sharedUrl);
+  }
+};
+
+const copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text);
+  isSharing.value = true;
+  toast.success("Network Synchronized", {
+    description: "Mission link copied to clipboard.",
   });
+  setTimeout(() => {
+    isSharing.value = false;
+  }, 2000);
 };
 
 const hydrateFromUrl = () => {
@@ -424,12 +502,14 @@ watch(tasks, saveTasks, { deep: true });
 
 <template>
   <TooltipProvider>
-    <Toaster position="bottom-right" richColors closeButton />
     <div
       class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
     >
+      <Toaster position="bottom-right" richColors closeButton />
       <div class="max-w-5xl mx-auto">
-        <header class="mb-12 relative flex justify-between items-start gap-4">
+        <header
+          class="mb-12 relative flex flex-col md:flex-row justify-between items-center md:items-start gap-8"
+        >
           <div class="flex flex-col mr-auto">
             <div class="flex items-center justify-start gap-4 mb-2">
               <div
@@ -444,41 +524,44 @@ watch(tasks, saveTasks, { deep: true });
               </h1>
             </div>
             <p
-              class="text-muted-foreground font-headings font-bold uppercase tracking-[0.3em] text-[10px] opacity-60"
+              class="text-muted-foreground font-headings font-black uppercase tracking-[0.3em] text-[10px] opacity-60 text-center md:text-left"
             >
               Automated Productivity Navigation // V4.0
             </p>
           </div>
 
-          <!-- Global Search -->
-          <div class="max-w-2xl relative group">
-            <div
-              class="absolute z-10 inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
-            >
-              <ph-circles-three-plus :size="20" />
+          <!-- Global Actions Container -->
+          <div class="flex items-center gap-4 w-full md:w-auto">
+            <!-- Global Search -->
+            <div class="relative group w-full md:w-auto">
+              <div
+                class="absolute z-10 inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
+              >
+                <ph-magnifying-glass :size="18" />
+              </div>
+
+              <Input
+                v-model="searchQuery"
+                placeholder="Search missions..."
+                class="pl-12 h-11 w-full md:w-64 bg-surface-container-high border-outline-variant/40 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold placeholder:text-muted-foreground/40! caret-primary transition-all duration-300 focus:md:w-80"
+              />
             </div>
 
-            <Input
-              v-model="searchQuery"
-              placeholder="Search missions..."
-              class="pl-12 h-10.5 w-xs bg-surface-container-high/50 border-outline-variant/10 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold placeholder:text-muted-foreground/40! caret-primary"
-            />
+            <Button
+              variant="outline"
+              size="icon"
+              @click="toggleDark()"
+              class="rounded-full h-11 w-11 border-outline-variant/20 bg-surface-container-highest backdrop-blur-sm hover:bg-surface-container-highest/70 transition-all duration-300 shadow-sm shadow-primary/20 shrink-0"
+            >
+              <ph-moon
+                v-if="isDark"
+                :size="20"
+                class="text-primary"
+                weight="fill"
+              />
+              <ph-sun v-else :size="20" class="text-accent" weight="fill" />
+            </Button>
           </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            @click="toggleDark()"
-            class="rounded-full border-outline-variant/20 bg-surface-container-highest/50 backdrop-blur-sm hover:bg-surface-container-highest transition-all duration-300 shadow-lg"
-          >
-            <ph-moon
-              v-if="isDark"
-              :size="20"
-              class="text-primary"
-              weight="fill"
-            />
-            <ph-sun v-else :size="20" class="text-accent" weight="fill" />
-          </Button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
@@ -486,7 +569,7 @@ watch(tasks, saveTasks, { deep: true });
           <aside class="space-y-6">
             <!-- CATEGORY CARD -->
             <Card
-              class="bg-surface-container-low border-none shadow-none overflow-hidden"
+              class="bg-surface-container-low border border-border/50 shadow-sm overflow-hidden"
             >
               <CardHeader class="pb-2">
                 <CardTitle
@@ -497,26 +580,23 @@ watch(tasks, saveTasks, { deep: true });
               <CardContent class="p-2 space-y-1">
                 <div
                   v-for="cat in categories"
-                  :key="cat"
-                  @click="currentCategory = cat"
+                  :key="cat.name"
+                  @click="currentCategory = cat.name"
                   :class="
                     cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10',
-                      currentCategory === cat
+                      currentCategory === cat.name
                         ? 'bg-primary/10 text-primary shadow-inner border border-primary/20'
                         : 'text-muted-foreground hover:bg-surface-container-high hover:text-foreground',
                     )
                   "
                 >
-                  <ph-circles-three-plus v-if="cat === 'All'" :size="18" />
-                  <ph-info v-else-if="cat === 'General'" :size="18" />
-                  <ph-fire v-else-if="cat === 'Automation'" :size="18" />
-                  <ph-check-circle v-else :size="18" />
+                  <component :is="cat.icon" :size="18" />
                   <span class="font-bold text-sm tracking-tight">{{
-                    cat
+                    cat.name
                   }}</span>
                   <div
-                    v-if="currentCategory === cat"
+                    v-if="currentCategory === cat.name"
                     class="absolute left-0 w-1 h-4 bg-primary rounded-r-full"
                   />
                 </div>
@@ -524,7 +604,9 @@ watch(tasks, saveTasks, { deep: true });
             </Card>
 
             <!-- MISION PROGRESS CARD -->
-            <Card class="bg-surface-container-low border-none shadow-none">
+            <Card
+              class="bg-surface-container-low border border-border/50 shadow-sm"
+            >
               <CardHeader class="pb-2">
                 <CardTitle
                   class="text-[10px] text-center font-headings font-black uppercase tracking-[0.2em] text-primary/60"
@@ -554,7 +636,7 @@ watch(tasks, saveTasks, { deep: true });
           <main class="space-y-6">
             <!-- ADD TASK -->
             <Card
-              class="border-none shadow-2xl overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
+              class="bg-surface-container-low border border-border/50 shadow-lg overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
             >
               <CardContent class="p-6">
                 <div class="space-y-4">
@@ -564,7 +646,7 @@ watch(tasks, saveTasks, { deep: true });
                     <InputGroupTextarea
                       v-model="newTodoInput"
                       placeholder="What's the next mission?"
-                      class="text-base font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5 min-h-20"
+                      class="text-base font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5 min-h-20 break-all"
                     />
 
                     <InputGroupAddon
@@ -627,10 +709,7 @@ watch(tasks, saveTasks, { deep: true });
                               id="sector-select"
                               class="h-8 bg-surface-container-highest border border-outline-variant/10 hover:bg-surface-container-highest/80 text-[10px] font-headings font-black uppercase tracking-wider px-3 rounded-lg gap-2 text-foreground transition-all"
                             >
-                              <ph-circles-three-plus
-                                :size="12"
-                                class="text-primary"
-                              />
+                              <ph-tag :size="12" class="text-primary" />
 
                               <SelectValue placeholder="Sector" />
                             </SelectTrigger>
@@ -639,13 +718,13 @@ watch(tasks, saveTasks, { deep: true });
                             >
                               <SelectItem
                                 v-for="c in categories.filter(
-                                  (cat) => cat !== 'All',
+                                  (cat) => cat.name !== 'All',
                                 )"
-                                :key="c"
-                                :value="c"
+                                :key="c.name"
+                                :value="c.name"
                                 class="text-xs font-bold"
                               >
-                                {{ c }}
+                                {{ c.name }}
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -713,7 +792,7 @@ watch(tasks, saveTasks, { deep: true });
 
             <!-- TASK LIST -->
             <Card
-              class="bg-surface-container-high/80 border-none shadow-xl overflow-hidden min-h-[400px] flex flex-col"
+              class="bg-surface-container-low dark:bg-surface-container-high/80 border border-border/50 shadow-sm overflow-hidden min-h-[400px] flex flex-col"
             >
               <div ref="taskListRef" class="flex flex-col grow">
                 <CardHeader
@@ -728,7 +807,7 @@ watch(tasks, saveTasks, { deep: true });
                     >
                   </CardTitle>
                   <div
-                    class="flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 pointer-events-auto"
+                    class="flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 pointer-events-auto shadow-sm shadow-primary/20"
                   >
                     <Button
                       v-for="filter in [
@@ -774,7 +853,7 @@ watch(tasks, saveTasks, { deep: true });
                         'group p-4 transition-all duration-300 border-none hover:bg-surface-container-highest/40 rounded-xl mb-2',
                         task.isCompleted
                           ? 'opacity-50'
-                          : 'bg-surface-container-highest/60 shadow-xl',
+                          : 'bg-surface-container-highest/60 shadow-sm',
                       )
                     "
                   >
@@ -782,7 +861,7 @@ watch(tasks, saveTasks, { deep: true });
                       <Checkbox
                         :model-value="task.isCompleted"
                         @update:model-value="toggleTodoStatus(task)"
-                        class="w-5 h-5 border-2 border-outline-variant/30 rounded-lg data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-300"
+                        class="w-5 h-5 border-2 border-primary/20 rounded-lg data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-300"
                       />
                     </ItemMedia>
 
@@ -795,13 +874,13 @@ watch(tasks, saveTasks, { deep: true });
                           @blur="saveEdit(task)"
                           @keyup.enter="saveEdit(task)"
                           @keyup.esc="cancelEdit(task)"
-                          class="w-full min-h-8 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar"
+                          class="w-full min-h-8 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar break-all"
                         />
                         <ItemTitle
                           v-else
                           :class="
                             cn(
-                              'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                              'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-all leading-tight grow min-w-0',
                               task.isCompleted &&
                                 'line-through text-muted-foreground opacity-50',
                             )
@@ -851,7 +930,10 @@ watch(tasks, saveTasks, { deep: true });
                         <span
                           class="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight"
                         >
-                          <ph-circles-three-plus :size="12" />
+                          <component
+                            :is="getCategoryIcon(task.category)"
+                            :size="12"
+                          />
                           {{ task.category }}
                         </span>
                         <span
@@ -963,8 +1045,14 @@ watch(tasks, saveTasks, { deep: true });
                       @click="generateShareUrl"
                       class="bg-primary hover:bg-primary/80 text-primary-foreground font-headings font-black uppercase tracking-wider h-9 px-5 rounded-lg gap-2 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
-                      <ph-share-network :size="18" weight="bold" />
-                      Share Task
+                      <template v-if="isSharing">
+                        <ph-check-circle :size="18" weight="bold" />
+                        Copied!
+                      </template>
+                      <template v-else>
+                        <ph-share-network :size="18" weight="bold" />
+                        Share Task
+                      </template>
                     </Button>
                     <Button
                       variant="ghost"
