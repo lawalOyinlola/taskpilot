@@ -28,7 +28,6 @@
     "clsx": "^2.1.1",
     "lucide-vue-next": "^1.0.0",
     "postcss": "^8.5.8",
-    "radix-vue": "^1.9.17",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.2",
     "tailwindcss-animate": "^1.0.7",
