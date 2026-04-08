@@ -23,7 +23,7 @@ import {
   PhTag,
 } from "@phosphor-icons/vue";
 import autoAnimate from "@formkit/auto-animate";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import LZString from "lz-string";
 import { cn } from "@/lib/utils";
 import { toast } from "vue-sonner";
@@ -358,40 +358,19 @@ const captureScreenshot = async () => {
   const toastId = toast.loading("Synthesizing Visual Log...");
 
   try {
-    // Advanced capture configuration to handle complex CSS
-    const canvas = await html2canvas(taskListRef.value, {
+    const dataUrl = await toPng(taskListRef.value, {
       backgroundColor: isDark.value ? "#0f172a" : "#f8fafc",
-      scale: 2,
-      logging: false,
-      useCORS: true,
-      allowTaint: false,
-      // The secret sauce: sanitize the DOM clone before rendering
-      onclone: (clonedDoc) => {
-        const clonedElement = clonedDoc.getElementById("task-pilot-capture-target");
-
-        if (clonedElement) {
-          // Remove problematic backdrop filters and transitions
-          const allElements = clonedElement.querySelectorAll("*");
-          allElements.forEach((el) => {
-            const style = window.getComputedStyle(el);
-            if (style.backdropFilter !== "none") {
-              el.style.backdropFilter = "none";
-              el.style.webkitBackdropFilter = "none";
-              // Fallback background for blurred elements
-              el.style.backgroundColor = isDark.value
-                ? "rgba(30, 41, 59, 0.8)"
-                : "rgba(255, 255, 255, 0.9)";
-            }
-            el.style.transition = "none";
-            el.style.animation = "none";
-          });
-        }
+      cacheBust: true,
+      quality: 0.95,
+      pixelRatio: 2, // High resolution (Retina quality)
+      style: {
+        transform: "scale(1)", // Ensure no accidental scaling artifacts
       },
     });
 
     const link = document.createElement("a");
     link.download = `taskpilot-log-${new Date().getTime()}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.href = dataUrl;
     link.click();
 
     toast.success("Log Decrypted & Saved", { id: toastId });
@@ -802,7 +781,11 @@ watch(tasks, saveTasks, { deep: true });
             <Card
               class="bg-surface-container-low dark:bg-surface-container-high/80 border border-border/50 shadow-sm overflow-hidden min-h-[400px] flex flex-col"
             >
-              <div ref="taskListRef" id="task-pilot-capture-target" class="flex flex-col grow">
+              <div
+                ref="taskListRef"
+                id="task-pilot-capture-target"
+                class="flex flex-col grow"
+              >
                 <CardHeader
                   class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
                 >
@@ -1061,7 +1044,7 @@ watch(tasks, saveTasks, { deep: true });
                   class="flex items-center justify-between p-6 pt-4 mt-auto border-t border-border/5"
                 >
                   <!-- DESKTOP BUTTONS -->
-                  <div class="hidden sm:flex gap-2">
+                  <div class="hidden sm:flex items-center gap-2">
                     <Button
                       @click="generateShareUrl"
                       class="font-black text-[10px] uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
@@ -1079,7 +1062,7 @@ watch(tasks, saveTasks, { deep: true });
                     <Button
                       variant="outline"
                       @click="captureScreenshot"
-                      class="h-9.5 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
+                      class="h-10 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                     >
                       <ph-camera :size="18" weight="bold" />
                       Screenshot
@@ -1128,12 +1111,28 @@ watch(tasks, saveTasks, { deep: true });
                     @click="clearAll"
                     class="h-9 px-4 rounded-lg text-destructive font-headings font-black text-[10px] uppercase tracking-widest hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
                   >
-                    Wipe Interface
+                    Clear All
                   </Button>
                 </CardFooter>
               </div>
             </Card>
           </main>
+
+          <!-- Developer Attribution Footer -->
+          <footer class="mt-8 pb-8 text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            <p class="text-[10px] font-headings font-bold text-muted-foreground/40 uppercase tracking-[0.2em] flex items-center justify-center gap-2">
+              <span>Developed with</span>
+              <ph-heart :size="14" weight="fill" class="text-destructive/60 animate-pulse" />
+              <span>by</span>
+              <a 
+                href="https://lawal.dev" 
+                target="_blank" 
+                class="text-primary/60 hover:text-primary transition-all duration-300 border-b border-transparent hover:border-primary/30 pb-0.5"
+              >
+                LAWAL
+              </a>
+            </p>
+          </footer>
         </div>
       </div>
     </div>
