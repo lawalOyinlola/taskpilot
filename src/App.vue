@@ -361,15 +361,13 @@ const captureScreenshot = async () => {
     // Advanced capture configuration to handle complex CSS
     const canvas = await html2canvas(taskListRef.value, {
       backgroundColor: isDark.value ? "#0f172a" : "#f8fafc",
-      scale: 3,
+      scale: 2,
       logging: false,
       useCORS: true,
-      allowTaint: true,
+      allowTaint: false,
       // The secret sauce: sanitize the DOM clone before rendering
       onclone: (clonedDoc) => {
-        const clonedElement =
-          clonedDoc.querySelector('[ref="taskListRef"]') ||
-          clonedDoc.body.querySelector(".flex.flex-col.grow");
+        const clonedElement = clonedDoc.getElementById("task-pilot-capture-target");
 
         if (clonedElement) {
           // Remove problematic backdrop filters and transitions
@@ -804,7 +802,7 @@ watch(tasks, saveTasks, { deep: true });
             <Card
               class="bg-surface-container-low dark:bg-surface-container-high/80 border border-border/50 shadow-sm overflow-hidden min-h-[400px] flex flex-col"
             >
-              <div ref="taskListRef" class="flex flex-col grow">
+              <div ref="taskListRef" id="task-pilot-capture-target" class="flex flex-col grow">
                 <CardHeader
                   class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
                 >
@@ -1066,9 +1064,9 @@ watch(tasks, saveTasks, { deep: true });
                   <div class="hidden sm:flex gap-2">
                     <Button
                       @click="generateShareUrl"
-                      class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                      class="font-black text-[10px] uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
-                      <template v-if="isSharing">
+                      <template v-if="isSharing" class="">
                         <ph-check-circle :size="18" weight="bold" />
                         Copied!
                       </template>
@@ -1081,7 +1079,7 @@ watch(tasks, saveTasks, { deep: true });
                     <Button
                       variant="outline"
                       @click="captureScreenshot"
-                      class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
+                      class="h-9.5 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                     >
                       <ph-camera :size="18" weight="bold" />
                       Screenshot
