@@ -503,12 +503,12 @@ watch(tasks, saveTasks, { deep: true });
 <template>
   <TooltipProvider>
     <div
-      class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
+      class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-3 py-8 sm:p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
     >
       <Toaster position="bottom-right" richColors closeButton />
-      <div class="max-w-5xl mx-auto">
+      <div class="max-w-5xl mx-auto w-full overflow-hidden">
         <header
-          class="mb-12 relative flex flex-col md:flex-row justify-between items-center md:items-start gap-8"
+          class="mb-12 relative flex flex-col md:flex-row justify-between items-center md:items-start gap-8 max-sm:px-2.5"
         >
           <div class="flex flex-col mr-auto">
             <div class="flex items-center justify-start gap-4 mb-2">
@@ -566,10 +566,10 @@ watch(tasks, saveTasks, { deep: true });
 
         <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
           <!-- Sidebar -->
-          <aside class="space-y-6">
+          <aside class="space-y-6 order-last lg:order-first">
             <!-- CATEGORY CARD -->
             <Card
-              class="bg-surface-container-low border border-border/50 shadow-sm overflow-hidden"
+              class="hidden sm:block bg-surface-container-low border border-border/50 shadow-sm overflow-hidden"
             >
               <CardHeader class="pb-2">
                 <CardTitle
@@ -633,7 +633,7 @@ watch(tasks, saveTasks, { deep: true });
           </aside>
 
           <!-- Main Content -->
-          <main class="space-y-6">
+          <main class="space-y-6 order-first lg:order-last">
             <!-- ADD TASK -->
             <Card
               class="bg-surface-container-low border border-border/50 shadow-lg overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
@@ -651,10 +651,9 @@ watch(tasks, saveTasks, { deep: true });
 
                     <InputGroupAddon
                       align="block-end"
-                      class="px-3 pb-3 pt-0 border-t-0 flex items-center justify-between"
+                      class="px-3 pb-3 pt-0 border-t-0 flex flex-wrap items-center justify-between gap-y-3"
                     >
-                      <div class="flex items-center gap-1.5">
-                        <!-- Priority Selector -->
+                      <div class="flex items-center gap-1.5 flex-wrap">
                         <div class="relative">
                           <Label for="priority-select" class="sr-only"
                             >Priority Level</Label
@@ -769,11 +768,10 @@ watch(tasks, saveTasks, { deep: true });
                         </div>
                       </div>
 
-                      <!-- Launch Button -->
                       <InputGroupButton
                         @click="addTask"
                         :disabled="!newTodoInput.trim()"
-                        class="h-9! px-4! bg-primary hover:bg-primary/80 text-primary-foreground font-black uppercase tracking-wider rounded-lg gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                        class="h-9! px-4! w-full sm:w-auto uppercase tracking-wider shadow-lg shadow-primary/20 active:scale-95 transition-al"
                       >
                         Launch
                         <ph-paper-plane-right :size="10" weight="bold" />
@@ -796,18 +794,17 @@ watch(tasks, saveTasks, { deep: true });
             >
               <div ref="taskListRef" class="flex flex-col grow">
                 <CardHeader
-                  class="flex flex-row items-center justify-between pb-6"
+                  class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
                 >
                   <CardTitle
                     class="text-xl font-headings font-extrabold tracking-tight"
                   >
                     Mission Feed:
-                    <span class="text-primary ml-1">
-                      {{ currentCategory }}</span
-                    >
+                    <span class="text-primary ml-1">{{ currentCategory }}</span>
                   </CardTitle>
+
                   <div
-                    class="flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 pointer-events-auto shadow-sm shadow-primary/20"
+                    class="hidden sm:flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 shadow-sm shadow-primary/20"
                   >
                     <Button
                       v-for="filter in [
@@ -824,13 +821,55 @@ watch(tasks, saveTasks, { deep: true });
                         cn(
                           'h-7.5 px-2.5 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
                           currentFilter === filter
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground rounded-lg'
+                            ? 'bg-primary text-primary-foreground rounded-lg'
                             : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/20',
                         )
                       "
                     >
                       {{ filter === "completed" ? "Done" : filter }}
                     </Button>
+                  </div>
+
+                  <div
+                    class="sm:hidden flex flex-row items-center gap-2 w-full"
+                  >
+                    <Select v-model="currentCategory">
+                      <SelectTrigger
+                        class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <SelectValue :placeholder="currentCategory" />
+                      </SelectTrigger>
+                      <SelectContent
+                        class="bg-surface-container-highest border-outline-variant/10"
+                      >
+                        <SelectItem
+                          v-for="cat in categories"
+                          :key="cat.name"
+                          :value="cat.name"
+                        >
+                          {{ cat.name }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select v-model="currentFilter">
+                      <SelectTrigger
+                        class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <SelectValue :placeholder="currentFilter" />
+                      </SelectTrigger>
+                      <SelectContent
+                        class="bg-surface-container-highest border-outline-variant/10"
+                      >
+                        <SelectItem
+                          v-for="f in ['all', 'active', 'completed', 'expired']"
+                          :key="f"
+                          :value="f"
+                        >
+                          {{ f.toUpperCase() }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardHeader>
 
@@ -850,14 +889,14 @@ watch(tasks, saveTasks, { deep: true });
                     :key="task.id"
                     :class="
                       cn(
-                        'group p-4 transition-all duration-300 border-none hover:bg-surface-container-highest/40 rounded-xl mb-2',
+                        'group p-3 sm:p-4 transition-all duration-300 border-none rounded-xl mb-2 flex items-start gap-2 sm:gap-4',
                         task.isCompleted
-                          ? 'opacity-50'
-                          : 'bg-surface-container-highest/60 shadow-sm',
+                          ? 'opacity-60 bg-surface-container-low'
+                          : 'bg-surface-container-highest/60 shadow-sm hover:bg-surface-container-highest/80',
                       )
                     "
                   >
-                    <ItemMedia class="pl-2">
+                    <ItemMedia class="pl-1 shrink-0 pt-1">
                       <Checkbox
                         :model-value="task.isCompleted"
                         @update:model-value="toggleTodoStatus(task)"
@@ -865,173 +904,145 @@ watch(tasks, saveTasks, { deep: true });
                       />
                     </ItemMedia>
 
-                    <ItemContent class="flex-1 w-full overflow-hidden">
-                      <div class="flex items-center gap-3">
-                        <Textarea
-                          v-if="task.isEditing"
-                          v-focus
-                          v-model="task.name"
-                          @blur="saveEdit(task)"
-                          @keyup.enter="saveEdit(task)"
-                          @keyup.esc="cancelEdit(task)"
-                          class="w-full min-h-8 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar break-all"
-                        />
-                        <ItemTitle
-                          v-else
-                          :class="
-                            cn(
-                              'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-all leading-tight grow min-w-0',
-                              task.isCompleted &&
-                                'line-through text-muted-foreground opacity-50',
-                            )
-                          "
-                        >
-                          {{ task.name }}
-                        </ItemTitle>
+                    <ItemContent class="flex-1 min-w-0 overflow-hidden">
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="grow min-w-0">
+                            <Textarea
+                              v-if="task.isEditing"
+                              v-focus
+                              v-model="task.name"
+                              @blur="saveEdit(task)"
+                              @keyup.enter="saveEdit(task)"
+                              @keyup.esc="cancelEdit(task)"
+                              class="w-full min-h-10 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar"
+                            />
+                            <ItemTitle
+                              v-else
+                              :class="
+                                cn(
+                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                                  task.isCompleted &&
+                                    'line-through text-muted-foreground opacity-50',
+                                )
+                              "
+                            >
+                              {{ task.name }}
+                            </ItemTitle>
+                          </div>
 
-                        <!-- Status Badges -->
-                        <div class="flex gap-1.5 shrink-0">
-                          <span
-                            v-if="isTaskExpired(task)"
-                            class="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse"
-                          >
-                            Expired
-                          </span>
-                          <span
-                            v-else-if="task.isCompleted"
-                            class="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary text-primary-foreground"
-                          >
-                            Done
-                          </span>
+                          <div class="flex gap-1 shrink-0 pt-0.5">
+                            <span
+                              v-if="isTaskExpired(task)"
+                              class="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse"
+                            >
+                              Expired
+                            </span>
+                            <span
+                              v-else-if="task.isCompleted"
+                              class="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary text-primary-foreground"
+                            >
+                              Done
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <ItemDescription class="flex items-center gap-3 mt-1.5">
-                        <span
-                          :class="
-                            cn(
-                              'text-[9px] font-headings font-black uppercase tracking-widest px-2 py-0.5 rounded-md border',
-                              task.priority === 'high'
-                                ? 'text-destructive bg-destructive/10 border-destructive/20'
-                                : task.priority === 'med'
-                                  ? 'text-tertiary bg-tertiary/10 border-tertiary/20'
-                                  : 'text-primary bg-primary/10 border-primary/20',
-                            )
-                          "
+                        <ItemDescription
+                          class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-1"
                         >
-                          {{
-                            task.priority === "med"
-                              ? "Standard"
-                              : task.priority === "high"
-                                ? "Critical"
-                                : "Low"
-                          }}
-                        </span>
-                        <span
-                          class="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight"
-                        >
-                          <component
-                            :is="getCategoryIcon(task.category)"
-                            :size="12"
-                          />
-                          {{ task.category }}
-                        </span>
-                        <span
-                          v-if="task.dueDate"
-                          :class="
-                            cn(
-                              'flex items-center gap-1 text-[11px] font-semibold uppercase tracking-tight',
-                              isTaskExpired(task)
-                                ? 'text-destructive'
-                                : 'text-primary/70',
-                            )
-                          "
-                        >
-                          <ph-clock :size="12" />
-                          {{
-                            new Date(task.dueDate).toLocaleDateString(
-                              undefined,
-                              { month: "short", day: "numeric" },
-                            )
-                          }}
-                        </span>
-                      </ItemDescription>
+                          <span
+                            :class="
+                              cn(
+                                'text-[9px] font-headings font-black uppercase tracking-widest px-2 py-0.5 rounded-md border shrink-0',
+                                task.priority === 'high'
+                                  ? 'text-destructive bg-destructive/10 border-destructive/20'
+                                  : task.priority === 'med'
+                                    ? 'text-tertiary bg-tertiary/10 border-tertiary/20'
+                                    : 'text-primary bg-primary/10 border-primary/20',
+                              )
+                            "
+                          >
+                            {{
+                              task.priority === "med"
+                                ? "Standard"
+                                : task.priority === "high"
+                                  ? "Critical"
+                                  : "Low"
+                            }}
+                          </span>
+
+                          <span
+                            class="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-tight shrink-0"
+                          >
+                            <component
+                              :is="getCategoryIcon(task.category)"
+                              :size="12"
+                            />
+                            {{ task.category }}
+                          </span>
+
+                          <span
+                            v-if="task.dueDate"
+                            :class="
+                              cn(
+                                'flex items-center gap-1 text-[10px] font-semibold uppercase tracking-tight shrink-0',
+                                isTaskExpired(task)
+                                  ? 'text-destructive'
+                                  : 'text-primary/70',
+                              )
+                            "
+                          >
+                            <ph-clock :size="12" />
+                            {{
+                              new Date(task.dueDate).toLocaleDateString(
+                                undefined,
+                                { month: "short", day: "numeric" },
+                              )
+                            }}
+                          </span>
+                        </ItemDescription>
+                      </div>
                     </ItemContent>
 
-                    <ItemActions class="flex items-center">
+                    <ItemActions
+                      class="flex flex-col sm:flex-row items-center gap-1 shrink-0"
+                    >
                       <template v-if="task.isEditing">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
-                              @mousedown.prevent="saveEdit(task)"
-                            >
-                              <ph-check-circle :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
-                          >
-                            Save Edit
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
-                              @mousedown.prevent="cancelEdit(task)"
-                            >
-                              <ph-x :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
-                          >
-                            Cancel
-                          </TooltipContent>
-                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          @mousedown.prevent="saveEdit(task)"
+                        >
+                          <ph-check-circle :size="20" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          @mousedown.prevent="cancelEdit(task)"
+                        >
+                          <ph-x :size="20" />
+                        </Button>
                       </template>
                       <template v-else>
-                        <Tooltip v-if="!task.isCompleted">
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
-                              @click="startEditing(task)"
-                            >
-                              <ph-pencil-simple-line :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
-                          >
-                            Edit Task
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
-                              @click="deleteTodo(task)"
-                            >
-                              <ph-trash :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
-                          >
-                            Delete Task
-                          </TooltipContent>
-                        </Tooltip>
+                        <Button
+                          v-if="!task.isCompleted"
+                          variant="ghost"
+                          size="icon"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          @click="startEditing(task)"
+                        >
+                          <ph-pencil-simple-line :size="20" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          @click="deleteTodo(task)"
+                        >
+                          <ph-trash :size="20" />
+                        </Button>
                       </template>
                     </ItemActions>
                   </Item>
@@ -1040,10 +1051,11 @@ watch(tasks, saveTasks, { deep: true });
                 <CardFooter
                   class="flex items-center justify-between p-6 pt-4 mt-auto border-t border-border/5"
                 >
-                  <div class="flex gap-2">
+                  <!-- DESKTOP BUTTONS -->
+                  <div class="hidden sm:flex gap-2">
                     <Button
                       @click="generateShareUrl"
-                      class="bg-primary hover:bg-primary/80 text-primary-foreground font-headings font-black uppercase tracking-wider h-9 px-5 rounded-lg gap-2 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                      class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
                       <template v-if="isSharing">
                         <ph-check-circle :size="18" weight="bold" />
@@ -1051,18 +1063,55 @@ watch(tasks, saveTasks, { deep: true });
                       </template>
                       <template v-else>
                         <ph-share-network :size="18" weight="bold" />
-                        Share Task
+
+                        Share Task{{ filteredTasks.length > 1 ? "s" : "" }}
                       </template>
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       @click="captureScreenshot"
-                      class="h-9 px-5 rounded-lg gap-2 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest border border-outline-variant/10 active:scale-95 transition-all font-headings font-black text-[10px] uppercase tracking-widest"
+                      class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                     >
-                      <ph-camera :size="18" />
-                      Visual Log
+                      <ph-camera :size="18" weight="bold" />
+                      Screenshot
                     </Button>
                   </div>
+
+                  <!-- MOBILE BUTTONS -->
+                  <div class="flex sm:hidden gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          @click="generateShareUrl"
+                          class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                        >
+                          <ph-share-network :size="18" weight="bold" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        class="bg-primary text-primary-foreground border-none font-bold text-xs"
+                      >
+                        Share Task{{ filteredTasks.length > 1 ? "s" : "" }}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          @click="captureScreenshot"
+                          class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
+                        >
+                          <ph-camera :size="18" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        class="bg-primary text-primary-foreground border-none font-bold text-xs"
+                      >
+                        Screenshot
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
                   <Button
                     variant="ghost"
                     @click="clearAll"
