@@ -1,23 +1,26 @@
 <script setup>
-import { ref, computed, watch, onMounted, nextTick } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { useDark, useToggle } from "@vueuse/core";
 import { format, addDays, isPast, endOfDay, parseISO, isToday } from "date-fns";
 import { CalendarDate, today, getLocalTimeZone } from "@internationalized/date";
 import {
   PhPencilSimpleLine,
   PhTrash,
-  PhPlus,
   PhShareNetwork,
   PhCamera,
-  PhInfo,
   PhListChecks,
-  PhFire,
-  PhCirclesThreePlus,
   PhClock,
   PhCheckCircle,
   PhMoon,
   PhSun,
   PhX,
+  PhMagnifyingGlass,
+  PhSquaresFour,
+  PhBriefcase,
+  PhUser,
+  PhRobot,
+  PhHeartbeat,
+  PhTag,
 } from "@phosphor-icons/vue";
 import autoAnimate from "@formkit/auto-animate";
 import html2canvas from "html2canvas";
@@ -106,17 +109,28 @@ const newTodoDueDateValue = computed(() => {
 });
 
 const searchQuery = ref("");
+const isSharing = ref(false);
+const lastDeletedTask = ref(null);
+const lastDeletedIndex = ref(-1);
+
+const truncate = (str, len = 50) =>
+  str.length > len ? str.slice(0, len) + "..." : str;
 
 // State
 const tasks = ref([]);
 const categories = [
-  "All",
-  "General",
-  "Work",
-  "Personal",
-  "Automation",
-  "Health",
+  { name: "All", icon: PhSquaresFour },
+  { name: "General", icon: PhTag },
+  { name: "Work", icon: PhBriefcase },
+  { name: "Personal", icon: PhUser },
+  { name: "Automation", icon: PhRobot },
+  { name: "Health", icon: PhHeartbeat },
 ];
+
+const getCategoryIcon = (categoryName) => {
+  const cat = categories.find((c) => c.name === categoryName);
+  return cat ? cat.icon : PhTag;
+};
 const priorities = [
   { id: "high", label: "High", class: "priority-high" },
   { id: "med", label: "Medium", class: "priority-med" },
@@ -125,7 +139,7 @@ const priorities = [
 
 // Computed
 const filteredTasks = computed(() => {
-  let result = tasks.value.filter((t) => !t.deleted);
+  let result = [...tasks.value];
 
   if (currentCategory.value !== "All") {
     result = result.filter((t) => t.category === currentCategory.value);
@@ -151,7 +165,7 @@ const filteredTasks = computed(() => {
 });
 
 const stats = computed(() => {
-  const active = tasks.value.filter((t) => !t.deleted);
+  const active = tasks.value;
   const completed = active.filter((t) => t.isCompleted).length;
   const total = active.length;
   const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -173,7 +187,6 @@ const loadTasks = () => {
       priority: t.priority ?? "med",
       category: t.category ?? "General",
       dueDate: t.dueDate ?? new Date().toISOString().split("T")[0],
-      deleted: t.deleted ?? false,
       isEditing: t.isEditing ?? false,
     }));
   } else {
@@ -187,7 +200,6 @@ const loadTasks = () => {
         category: "Automation",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -197,7 +209,6 @@ const loadTasks = () => {
         category: "Automation",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -207,7 +218,6 @@ const loadTasks = () => {
         category: "Health",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
       {
@@ -217,7 +227,6 @@ const loadTasks = () => {
         category: "Work",
         dueDate: now,
         isCompleted: false,
-        deleted: false,
         isEditing: false,
       },
     ];
@@ -235,6 +244,9 @@ const saveEdit = (task) => {
   if (!task.isEditing) return;
   task.isEditing = false;
   saveTasks();
+  toast.success("Mission Updated", {
+    description: `Directives for "${truncate(task.name)}" synchronized.`,
+  });
 };
 
 const cancelEdit = (task) => {
@@ -257,13 +269,12 @@ const addTask = () => {
         : newTodoCategory.value,
     dueDate: newTodoDueDate.value ?? defaultDate,
     isCompleted: false,
-    deleted: false,
     isEditing: false,
     createdAt: new Date().toISOString(),
   });
 
-  toast.success("Task Registered", {
-    description: "New objective added to your queue.",
+  toast.success("Mission Assigned", {
+    description: "New objective prioritized in your queue.",
   });
   newTodoInput.value = "";
   // Reset selection states to null to show placeholders
@@ -277,43 +288,54 @@ const toggleTodoStatus = (task) => {
   task.isCompleted = !task.isCompleted;
   saveTasks();
   if (task.isCompleted) {
-    toast.success("Objective Achieved", {
-      description: `Task "${task.name}" completed.`,
+    toast.success("Mission Accomplished", {
+      description: `Objective "${truncate(task.name)}" secured.`,
     });
   } else {
-    toast.info("Task Reactivated", {
-      description: `Task "${task.name}" is back in focus.`,
+    toast.info("Mission Resumed", {
+      description: `Task "${truncate(task.name)}" is back on the radar.`,
     });
   }
 };
 
 const deleteTodo = (task) => {
-  const originalState = task.deleted;
-  task.deleted = true;
+  const index = tasks.value.findIndex((t) => t.id === task.id);
+  if (index === -1) return;
+
+  lastDeletedTask.value = { ...tasks.value[index] };
+  lastDeletedIndex.value = index;
+
+  tasks.value.splice(index, 1);
   saveTasks();
-  toast.info("Task moved to archives", {
-    description: `Task: ${task.name}`,
+
+  toast.info("Mission Terminated", {
+    description: `Target removed: ${truncate(task.name)}`,
     action: {
       label: "Undo",
       onClick: () => {
-        task.deleted = originalState;
-        saveTasks();
+        if (lastDeletedTask.value) {
+          tasks.value.splice(lastDeletedIndex.value, 0, lastDeletedTask.value);
+          saveTasks();
+          lastDeletedTask.value = null;
+          lastDeletedIndex.value = -1;
+          toast.success("Mission Restored");
+        }
       },
     },
   });
 };
 
 const clearAll = () => {
-  if (tasks.value.filter((t) => !t.deleted).length === 0) return;
+  if (tasks.value.length === 0) return;
 
-  toast.warning("Clear the entire deck?", {
-    description: "This will archive all currently active tasks.",
+  toast.warning("Wipe entire interface?", {
+    description: "This will permanently terminate all active missions.",
     action: {
       label: "Confirm",
       onClick: () => {
-        tasks.value.forEach((t) => (t.deleted = true));
+        tasks.value = [];
         saveTasks();
-        toast.success("Deck cleared");
+        toast.success("Interface Purged");
       },
     },
   });
@@ -335,39 +357,95 @@ const getTaskStatus = (task) => {
 // Screenshot Logic
 const captureScreenshot = async () => {
   if (!taskListRef.value) return;
-  toast.info("Generating screenshot...");
-  await nextTick();
+  const toastId = toast.loading("Synthesizing Visual Log...");
+
   try {
+    // Advanced capture configuration to handle complex CSS
     const canvas = await html2canvas(taskListRef.value, {
-      backgroundColor: "#0f172a",
-      borderRadius: 24,
-      scale: 2,
-      logging: true,
+      backgroundColor: isDark.value ? "#0f172a" : "#f8fafc",
+      scale: 3,
+      logging: false,
       useCORS: true,
+      allowTaint: true,
+      // The secret sauce: sanitize the DOM clone before rendering
+      onclone: (clonedDoc) => {
+        const clonedElement =
+          clonedDoc.querySelector('[ref="taskListRef"]') ||
+          clonedDoc.body.querySelector(".flex.flex-col.grow");
+
+        if (clonedElement) {
+          // Remove problematic backdrop filters and transitions
+          const allElements = clonedElement.querySelectorAll("*");
+          allElements.forEach((el) => {
+            const style = window.getComputedStyle(el);
+            if (style.backdropFilter !== "none") {
+              el.style.backdropFilter = "none";
+              el.style.webkitBackdropFilter = "none";
+              // Fallback background for blurred elements
+              el.style.backgroundColor = isDark.value
+                ? "rgba(30, 41, 59, 0.8)"
+                : "rgba(255, 255, 255, 0.9)";
+            }
+            el.style.transition = "none";
+            el.style.animation = "none";
+          });
+        }
+      },
     });
+
     const link = document.createElement("a");
-    link.download = `taskpilot-snapshot-${new Date().toISOString().slice(0, 10)}.png`;
-    link.href = canvas.toDataURL();
+    link.download = `taskpilot-log-${new Date().getTime()}.png`;
+    link.href = canvas.toDataURL("image/png");
     link.click();
-    toast.success("Screenshot saved!");
+
+    toast.success("Log Decrypted & Saved", { id: toastId });
   } catch (err) {
-    console.error(err);
-    toast.error("Failed to capture screenshot");
+    console.error("Capture Error:", err);
+    toast.error("Visual Log Synthesis Failed", { id: toastId });
   }
 };
 
 // Sharing Logic
-const generateShareUrl = () => {
-  const activeTasks = tasks.value.filter((t) => !t.deleted);
+const generateShareUrl = async () => {
+  const activeTasks = tasks.value;
   const data = JSON.stringify(activeTasks);
   const compressed = LZString.compressToEncodedURIComponent(data);
   const url = new URL(window.location.href);
   url.searchParams.set("share", compressed);
+  const sharedUrl = url.toString();
 
-  navigator.clipboard.writeText(url.toString());
-  toast.success("Network Shared", {
-    description: "Shareable tasks link copied to clipboard.",
+  if (
+    navigator.share &&
+    navigator.canShare &&
+    navigator.canShare({ url: sharedUrl })
+  ) {
+    try {
+      await navigator.share({
+        title: "TaskPilot Mission List",
+        text: "Check out these operational objectives.",
+        url: sharedUrl,
+      });
+      toast.success("Network Synchronized");
+    } catch (err) {
+      if (err.name !== "AbortError") {
+        console.error("Share failed:", err);
+        copyToClipboard(sharedUrl);
+      }
+    }
+  } else {
+    copyToClipboard(sharedUrl);
+  }
+};
+
+const copyToClipboard = (text) => {
+  navigator.clipboard.writeText(text);
+  isSharing.value = true;
+  toast.success("Network Synchronized", {
+    description: "Mission link copied to clipboard.",
   });
+  setTimeout(() => {
+    isSharing.value = false;
+  }, 2000);
 };
 
 const hydrateFromUrl = () => {
@@ -424,12 +502,14 @@ watch(tasks, saveTasks, { deep: true });
 
 <template>
   <TooltipProvider>
-    <Toaster position="bottom-right" richColors closeButton />
     <div
-      class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
+      class="min-h-screen bg-surface text-foreground font-sans selection:bg-primary/20 p-3 py-8 sm:p-4 md:p-8 relative overflow-x-hidden transition-all duration-700"
     >
-      <div class="max-w-5xl mx-auto">
-        <header class="mb-12 relative flex justify-between items-start gap-4">
+      <Toaster position="bottom-right" richColors closeButton />
+      <div class="max-w-5xl mx-auto w-full overflow-hidden">
+        <header
+          class="mb-12 relative flex flex-col md:flex-row justify-between items-center md:items-start gap-8 max-sm:px-2.5"
+        >
           <div class="flex flex-col mr-auto">
             <div class="flex items-center justify-start gap-4 mb-2">
               <div
@@ -444,49 +524,52 @@ watch(tasks, saveTasks, { deep: true });
               </h1>
             </div>
             <p
-              class="text-muted-foreground font-headings font-bold uppercase tracking-[0.3em] text-[10px] opacity-60"
+              class="text-muted-foreground font-headings font-black uppercase tracking-[0.3em] text-[10px] opacity-60 text-center md:text-left"
             >
               Automated Productivity Navigation // V4.0
             </p>
           </div>
 
-          <!-- Global Search -->
-          <div class="max-w-2xl relative group">
-            <div
-              class="absolute z-10 inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
-            >
-              <ph-circles-three-plus :size="20" />
+          <!-- Global Actions Container -->
+          <div class="flex items-center gap-4 w-full md:w-auto">
+            <!-- Global Search -->
+            <div class="relative group w-full md:w-auto">
+              <div
+                class="absolute z-10 inset-y-0 left-4 flex items-center pointer-events-none text-muted-foreground group-focus-within:text-primary transition-colors"
+              >
+                <ph-magnifying-glass :size="18" />
+              </div>
+
+              <Input
+                v-model="searchQuery"
+                placeholder="Search missions..."
+                class="pl-12 h-11 w-full md:w-64 bg-surface-container-high border-outline-variant/40 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold placeholder:text-muted-foreground/40! caret-primary transition-all duration-300 focus:md:w-80"
+              />
             </div>
 
-            <Input
-              v-model="searchQuery"
-              placeholder="Search missions..."
-              class="pl-12 h-10.5 w-xs bg-surface-container-high/50 border-outline-variant/10 focus-visible:ring-primary/30 rounded-2xl backdrop-blur-xl shadow-inner font-headings font-bold placeholder:text-muted-foreground/40! caret-primary"
-            />
+            <Button
+              variant="outline"
+              size="icon"
+              @click="toggleDark()"
+              class="rounded-full h-11 w-11 border-outline-variant/20 bg-surface-container-highest backdrop-blur-sm hover:bg-surface-container-highest/70 transition-all duration-300 shadow-sm shadow-primary/20 shrink-0"
+            >
+              <ph-moon
+                v-if="isDark"
+                :size="20"
+                class="text-primary"
+                weight="fill"
+              />
+              <ph-sun v-else :size="20" class="text-accent" weight="fill" />
+            </Button>
           </div>
-
-          <Button
-            variant="outline"
-            size="icon"
-            @click="toggleDark()"
-            class="rounded-full border-outline-variant/20 bg-surface-container-highest/50 backdrop-blur-sm hover:bg-surface-container-highest transition-all duration-300 shadow-lg"
-          >
-            <ph-moon
-              v-if="isDark"
-              :size="20"
-              class="text-primary"
-              weight="fill"
-            />
-            <ph-sun v-else :size="20" class="text-accent" weight="fill" />
-          </Button>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
           <!-- Sidebar -->
-          <aside class="space-y-6">
+          <aside class="space-y-6 order-last lg:order-first">
             <!-- CATEGORY CARD -->
             <Card
-              class="bg-surface-container-low border-none shadow-none overflow-hidden"
+              class="hidden sm:block bg-surface-container-low border border-border/50 shadow-sm overflow-hidden"
             >
               <CardHeader class="pb-2">
                 <CardTitle
@@ -497,26 +580,23 @@ watch(tasks, saveTasks, { deep: true });
               <CardContent class="p-2 space-y-1">
                 <div
                   v-for="cat in categories"
-                  :key="cat"
-                  @click="currentCategory = cat"
+                  :key="cat.name"
+                  @click="currentCategory = cat.name"
                   :class="
                     cn(
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10',
-                      currentCategory === cat
+                      currentCategory === cat.name
                         ? 'bg-primary/10 text-primary shadow-inner border border-primary/20'
                         : 'text-muted-foreground hover:bg-surface-container-high hover:text-foreground',
                     )
                   "
                 >
-                  <ph-circles-three-plus v-if="cat === 'All'" :size="18" />
-                  <ph-info v-else-if="cat === 'General'" :size="18" />
-                  <ph-fire v-else-if="cat === 'Automation'" :size="18" />
-                  <ph-check-circle v-else :size="18" />
+                  <component :is="cat.icon" :size="18" />
                   <span class="font-bold text-sm tracking-tight">{{
-                    cat
+                    cat.name
                   }}</span>
                   <div
-                    v-if="currentCategory === cat"
+                    v-if="currentCategory === cat.name"
                     class="absolute left-0 w-1 h-4 bg-primary rounded-r-full"
                   />
                 </div>
@@ -524,7 +604,9 @@ watch(tasks, saveTasks, { deep: true });
             </Card>
 
             <!-- MISION PROGRESS CARD -->
-            <Card class="bg-surface-container-low border-none shadow-none">
+            <Card
+              class="bg-surface-container-low border border-border/50 shadow-sm"
+            >
               <CardHeader class="pb-2">
                 <CardTitle
                   class="text-[10px] text-center font-headings font-black uppercase tracking-[0.2em] text-primary/60"
@@ -551,10 +633,10 @@ watch(tasks, saveTasks, { deep: true });
           </aside>
 
           <!-- Main Content -->
-          <main class="space-y-6">
+          <main class="space-y-6 order-first lg:order-last">
             <!-- ADD TASK -->
             <Card
-              class="border-none shadow-2xl overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
+              class="bg-surface-container-low border border-border/50 shadow-lg overflow-hidden group focus-within:ring-2 focus-within:ring-primary/10 transition-all duration-500"
             >
               <CardContent class="p-6">
                 <div class="space-y-4">
@@ -564,15 +646,14 @@ watch(tasks, saveTasks, { deep: true });
                     <InputGroupTextarea
                       v-model="newTodoInput"
                       placeholder="What's the next mission?"
-                      class="text-base font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5 min-h-20"
+                      class="text-base font-headings font-bold placeholder:text-muted-foreground/20 px-4 pt-4 pb-2.5 min-h-20 break-all"
                     />
 
                     <InputGroupAddon
                       align="block-end"
-                      class="px-3 pb-3 pt-0 border-t-0 flex items-center justify-between"
+                      class="px-3 pb-3 pt-0 border-t-0 flex flex-wrap items-center justify-between gap-y-3"
                     >
-                      <div class="flex items-center gap-1.5">
-                        <!-- Priority Selector -->
+                      <div class="flex items-center gap-1.5 flex-wrap">
                         <div class="relative">
                           <Label for="priority-select" class="sr-only"
                             >Priority Level</Label
@@ -627,10 +708,7 @@ watch(tasks, saveTasks, { deep: true });
                               id="sector-select"
                               class="h-8 bg-surface-container-highest border border-outline-variant/10 hover:bg-surface-container-highest/80 text-[10px] font-headings font-black uppercase tracking-wider px-3 rounded-lg gap-2 text-foreground transition-all"
                             >
-                              <ph-circles-three-plus
-                                :size="12"
-                                class="text-primary"
-                              />
+                              <ph-tag :size="12" class="text-primary" />
 
                               <SelectValue placeholder="Sector" />
                             </SelectTrigger>
@@ -639,13 +717,13 @@ watch(tasks, saveTasks, { deep: true });
                             >
                               <SelectItem
                                 v-for="c in categories.filter(
-                                  (cat) => cat !== 'All',
+                                  (cat) => cat.name !== 'All',
                                 )"
-                                :key="c"
-                                :value="c"
+                                :key="c.name"
+                                :value="c.name"
                                 class="text-xs font-bold"
                               >
-                                {{ c }}
+                                {{ c.name }}
                               </SelectItem>
                             </SelectContent>
                           </Select>
@@ -690,11 +768,10 @@ watch(tasks, saveTasks, { deep: true });
                         </div>
                       </div>
 
-                      <!-- Launch Button -->
                       <InputGroupButton
                         @click="addTask"
                         :disabled="!newTodoInput.trim()"
-                        class="h-9! px-4! bg-primary hover:bg-primary/80 text-primary-foreground font-black uppercase tracking-wider rounded-lg gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all"
+                        class="h-9! px-4! w-full sm:w-auto uppercase tracking-wider shadow-lg shadow-primary/20 active:scale-95 transition-al"
                       >
                         Launch
                         <ph-paper-plane-right :size="10" weight="bold" />
@@ -713,22 +790,21 @@ watch(tasks, saveTasks, { deep: true });
 
             <!-- TASK LIST -->
             <Card
-              class="bg-surface-container-high/80 border-none shadow-xl overflow-hidden min-h-[400px] flex flex-col"
+              class="bg-surface-container-low dark:bg-surface-container-high/80 border border-border/50 shadow-sm overflow-hidden min-h-[400px] flex flex-col"
             >
               <div ref="taskListRef" class="flex flex-col grow">
                 <CardHeader
-                  class="flex flex-row items-center justify-between pb-6"
+                  class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
                 >
                   <CardTitle
                     class="text-xl font-headings font-extrabold tracking-tight"
                   >
                     Mission Feed:
-                    <span class="text-primary ml-1">
-                      {{ currentCategory }}</span
-                    >
+                    <span class="text-primary ml-1">{{ currentCategory }}</span>
                   </CardTitle>
+
                   <div
-                    class="flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 pointer-events-auto"
+                    class="hidden sm:flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 shadow-sm shadow-primary/20"
                   >
                     <Button
                       v-for="filter in [
@@ -745,13 +821,55 @@ watch(tasks, saveTasks, { deep: true });
                         cn(
                           'h-7.5 px-2.5 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
                           currentFilter === filter
-                            ? 'bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground rounded-lg'
+                            ? 'bg-primary text-primary-foreground rounded-lg'
                             : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/20',
                         )
                       "
                     >
                       {{ filter === "completed" ? "Done" : filter }}
                     </Button>
+                  </div>
+
+                  <div
+                    class="sm:hidden flex flex-row items-center gap-2 w-full"
+                  >
+                    <Select v-model="currentCategory">
+                      <SelectTrigger
+                        class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <SelectValue :placeholder="currentCategory" />
+                      </SelectTrigger>
+                      <SelectContent
+                        class="bg-surface-container-highest border-outline-variant/10"
+                      >
+                        <SelectItem
+                          v-for="cat in categories"
+                          :key="cat.name"
+                          :value="cat.name"
+                        >
+                          {{ cat.name }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select v-model="currentFilter">
+                      <SelectTrigger
+                        class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+                      >
+                        <SelectValue :placeholder="currentFilter" />
+                      </SelectTrigger>
+                      <SelectContent
+                        class="bg-surface-container-highest border-outline-variant/10"
+                      >
+                        <SelectItem
+                          v-for="f in ['all', 'active', 'completed', 'expired']"
+                          :key="f"
+                          :value="f"
+                        >
+                          {{ f.toUpperCase() }}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </CardHeader>
 
@@ -771,185 +889,160 @@ watch(tasks, saveTasks, { deep: true });
                     :key="task.id"
                     :class="
                       cn(
-                        'group p-4 transition-all duration-300 border-none hover:bg-surface-container-highest/40 rounded-xl mb-2',
+                        'group p-3 sm:p-4 transition-all duration-300 border-none rounded-xl mb-2 flex items-start gap-2 sm:gap-4',
                         task.isCompleted
-                          ? 'opacity-50'
-                          : 'bg-surface-container-highest/60 shadow-xl',
+                          ? 'opacity-60 bg-surface-container-low'
+                          : 'bg-surface-container-highest/60 shadow-sm hover:bg-surface-container-highest/80',
                       )
                     "
                   >
-                    <ItemMedia class="pl-2">
+                    <ItemMedia class="pl-1 shrink-0 pt-1">
                       <Checkbox
                         :model-value="task.isCompleted"
                         @update:model-value="toggleTodoStatus(task)"
-                        class="w-5 h-5 border-2 border-outline-variant/30 rounded-lg data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-300"
+                        class="w-5 h-5 border-2 border-primary/20 rounded-lg data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all duration-300"
                       />
                     </ItemMedia>
 
-                    <ItemContent class="flex-1 w-full overflow-hidden">
-                      <div class="flex items-center gap-3">
-                        <Textarea
-                          v-if="task.isEditing"
-                          v-focus
-                          v-model="task.name"
-                          @blur="saveEdit(task)"
-                          @keyup.enter="saveEdit(task)"
-                          @keyup.esc="cancelEdit(task)"
-                          class="w-full min-h-8 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar"
-                        />
-                        <ItemTitle
-                          v-else
-                          :class="
-                            cn(
-                              'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
-                              task.isCompleted &&
-                                'line-through text-muted-foreground opacity-50',
-                            )
-                          "
-                        >
-                          {{ task.name }}
-                        </ItemTitle>
+                    <ItemContent class="flex-1 min-w-0 overflow-hidden">
+                      <div class="flex flex-col gap-1">
+                        <div class="flex items-start justify-between gap-2">
+                          <div class="grow min-w-0">
+                            <Textarea
+                              v-if="task.isEditing"
+                              v-focus
+                              v-model="task.name"
+                              @blur="saveEdit(task)"
+                              @keyup.enter="saveEdit(task)"
+                              @keyup.esc="cancelEdit(task)"
+                              class="w-full min-h-10 text-base font-headings font-bold py-1 px-3 bg-surface-container/50 border border-primary/30 rounded-lg focus:ring-1 focus:ring-primary/50 resize-none no-scrollbar"
+                            />
+                            <ItemTitle
+                              v-else
+                              :class="
+                                cn(
+                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                                  task.isCompleted &&
+                                    'line-through text-muted-foreground opacity-50',
+                                )
+                              "
+                            >
+                              {{ task.name }}
+                            </ItemTitle>
+                          </div>
 
-                        <!-- Status Badges -->
-                        <div class="flex gap-1.5 shrink-0">
-                          <span
-                            v-if="isTaskExpired(task)"
-                            class="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse"
-                          >
-                            Expired
-                          </span>
-                          <span
-                            v-else-if="task.isCompleted"
-                            class="text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary text-primary-foreground"
-                          >
-                            Done
-                          </span>
+                          <div class="flex gap-1 shrink-0 pt-0.5">
+                            <span
+                              v-if="isTaskExpired(task)"
+                              class="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-destructive text-destructive-foreground animate-pulse"
+                            >
+                              Expired
+                            </span>
+                            <span
+                              v-else-if="task.isCompleted"
+                              class="text-[8px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded bg-primary text-primary-foreground"
+                            >
+                              Done
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <ItemDescription class="flex items-center gap-3 mt-1.5">
-                        <span
-                          :class="
-                            cn(
-                              'text-[9px] font-headings font-black uppercase tracking-widest px-2 py-0.5 rounded-md border',
-                              task.priority === 'high'
-                                ? 'text-destructive bg-destructive/10 border-destructive/20'
-                                : task.priority === 'med'
-                                  ? 'text-tertiary bg-tertiary/10 border-tertiary/20'
-                                  : 'text-primary bg-primary/10 border-primary/20',
-                            )
-                          "
+                        <ItemDescription
+                          class="flex flex-wrap items-center gap-x-3 gap-y-2 mt-1"
                         >
-                          {{
-                            task.priority === "med"
-                              ? "Standard"
-                              : task.priority === "high"
-                                ? "Critical"
-                                : "Low"
-                          }}
-                        </span>
-                        <span
-                          class="flex items-center gap-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-tight"
-                        >
-                          <ph-circles-three-plus :size="12" />
-                          {{ task.category }}
-                        </span>
-                        <span
-                          v-if="task.dueDate"
-                          :class="
-                            cn(
-                              'flex items-center gap-1 text-[11px] font-semibold uppercase tracking-tight',
-                              isTaskExpired(task)
-                                ? 'text-destructive'
-                                : 'text-primary/70',
-                            )
-                          "
-                        >
-                          <ph-clock :size="12" />
-                          {{
-                            new Date(task.dueDate).toLocaleDateString(
-                              undefined,
-                              { month: "short", day: "numeric" },
-                            )
-                          }}
-                        </span>
-                      </ItemDescription>
+                          <span
+                            :class="
+                              cn(
+                                'text-[9px] font-headings font-black uppercase tracking-widest px-2 py-0.5 rounded-md border shrink-0',
+                                task.priority === 'high'
+                                  ? 'text-destructive bg-destructive/10 border-destructive/20'
+                                  : task.priority === 'med'
+                                    ? 'text-tertiary bg-tertiary/10 border-tertiary/20'
+                                    : 'text-primary bg-primary/10 border-primary/20',
+                              )
+                            "
+                          >
+                            {{
+                              task.priority === "med"
+                                ? "Standard"
+                                : task.priority === "high"
+                                  ? "Critical"
+                                  : "Low"
+                            }}
+                          </span>
+
+                          <span
+                            class="flex items-center gap-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-tight shrink-0"
+                          >
+                            <component
+                              :is="getCategoryIcon(task.category)"
+                              :size="12"
+                            />
+                            {{ task.category }}
+                          </span>
+
+                          <span
+                            v-if="task.dueDate"
+                            :class="
+                              cn(
+                                'flex items-center gap-1 text-[10px] font-semibold uppercase tracking-tight shrink-0',
+                                isTaskExpired(task)
+                                  ? 'text-destructive'
+                                  : 'text-primary/70',
+                              )
+                            "
+                          >
+                            <ph-clock :size="12" />
+                            {{
+                              new Date(task.dueDate).toLocaleDateString(
+                                undefined,
+                                { month: "short", day: "numeric" },
+                              )
+                            }}
+                          </span>
+                        </ItemDescription>
+                      </div>
                     </ItemContent>
 
-                    <ItemActions class="flex items-center">
+                    <ItemActions
+                      class="flex flex-col sm:flex-row items-center gap-1 shrink-0"
+                    >
                       <template v-if="task.isEditing">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
-                              @mousedown.prevent="saveEdit(task)"
-                            >
-                              <ph-check-circle :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
-                          >
-                            Save Edit
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
-                              @mousedown.prevent="cancelEdit(task)"
-                            >
-                              <ph-x :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
-                          >
-                            Cancel
-                          </TooltipContent>
-                        </Tooltip>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          @mousedown.prevent="saveEdit(task)"
+                        >
+                          <ph-check-circle :size="20" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          @mousedown.prevent="cancelEdit(task)"
+                        >
+                          <ph-x :size="20" />
+                        </Button>
                       </template>
                       <template v-else>
-                        <Tooltip v-if="!task.isCompleted">
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all mr-1"
-                              @click="startEditing(task)"
-                            >
-                              <ph-pencil-simple-line :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-primary text-primary-foreground border-none font-bold text-xs"
-                          >
-                            Edit Task
-                          </TooltipContent>
-                        </Tooltip>
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              class="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
-                              @click="deleteTodo(task)"
-                            >
-                              <ph-trash :size="18" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            class="bg-destructive text-destructive-foreground border-none font-bold text-xs"
-                          >
-                            Delete Task
-                          </TooltipContent>
-                        </Tooltip>
+                        <Button
+                          v-if="!task.isCompleted"
+                          variant="ghost"
+                          size="icon"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          @click="startEditing(task)"
+                        >
+                          <ph-pencil-simple-line :size="20" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          @click="deleteTodo(task)"
+                        >
+                          <ph-trash :size="20" />
+                        </Button>
                       </template>
                     </ItemActions>
                   </Item>
@@ -958,23 +1051,67 @@ watch(tasks, saveTasks, { deep: true });
                 <CardFooter
                   class="flex items-center justify-between p-6 pt-4 mt-auto border-t border-border/5"
                 >
-                  <div class="flex gap-2">
+                  <!-- DESKTOP BUTTONS -->
+                  <div class="hidden sm:flex gap-2">
                     <Button
                       @click="generateShareUrl"
-                      class="bg-primary hover:bg-primary/80 text-primary-foreground font-headings font-black uppercase tracking-wider h-9 px-5 rounded-lg gap-2 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                      class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
-                      <ph-share-network :size="18" weight="bold" />
-                      Share Task
+                      <template v-if="isSharing">
+                        <ph-check-circle :size="18" weight="bold" />
+                        Copied!
+                      </template>
+                      <template v-else>
+                        <ph-share-network :size="18" weight="bold" />
+
+                        Share Task{{ filteredTasks.length > 1 ? "s" : "" }}
+                      </template>
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       @click="captureScreenshot"
-                      class="h-9 px-5 rounded-lg gap-2 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest border border-outline-variant/10 active:scale-95 transition-all font-headings font-black text-[10px] uppercase tracking-widest"
+                      class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                     >
-                      <ph-camera :size="18" />
-                      Visual Log
+                      <ph-camera :size="18" weight="bold" />
+                      Screenshot
                     </Button>
                   </div>
+
+                  <!-- MOBILE BUTTONS -->
+                  <div class="flex sm:hidden gap-2">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          @click="generateShareUrl"
+                          class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                        >
+                          <ph-share-network :size="18" weight="bold" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        class="bg-primary text-primary-foreground border-none font-bold text-xs"
+                      >
+                        Share Task{{ filteredTasks.length > 1 ? "s" : "" }}
+                      </TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="outline"
+                          @click="captureScreenshot"
+                          class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
+                        >
+                          <ph-camera :size="18" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        class="bg-primary text-primary-foreground border-none font-bold text-xs"
+                      >
+                        Screenshot
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+
                   <Button
                     variant="ghost"
                     @click="clearAll"
