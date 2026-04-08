@@ -40,6 +40,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions");
   <Sonner
     class="toaster group"
     :toast-options="{
+      ...props.toastOptions,
       classes: {
         toast:
           'group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg',
@@ -48,6 +49,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions");
           'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground',
         cancelButton:
           'group-[.toast]:bg-muted group-[.toast]:text-muted-foreground',
+        ...props.toastOptions?.classes,
       },
     }"
     v-bind="delegatedProps"

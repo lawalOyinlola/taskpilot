@@ -23,7 +23,7 @@ import {
   PhTag,
 } from "@phosphor-icons/vue";
 import autoAnimate from "@formkit/auto-animate";
-import html2canvas from "html2canvas";
+import { toPng } from "html-to-image";
 import LZString from "lz-string";
 import { cn } from "@/lib/utils";
 import { toast } from "vue-sonner";
@@ -302,8 +302,8 @@ const deleteTodo = (task) => {
   const index = tasks.value.findIndex((t) => t.id === task.id);
   if (index === -1) return;
 
-  lastDeletedTask.value = { ...tasks.value[index] };
-  lastDeletedIndex.value = index;
+  const deletedTask = { ...tasks.value[index] };
+  const deletedIndex = index;
 
   tasks.value.splice(index, 1);
   saveTasks();
@@ -313,11 +313,9 @@ const deleteTodo = (task) => {
     action: {
       label: "Undo",
       onClick: () => {
-        if (lastDeletedTask.value) {
-          tasks.value.splice(lastDeletedIndex.value, 0, lastDeletedTask.value);
+        if (deletedTask) {
+          tasks.value.splice(deletedIndex, 0, deletedTask);
           saveTasks();
-          lastDeletedTask.value = null;
-          lastDeletedIndex.value = -1;
           toast.success("Mission Restored");
         }
       },
@@ -360,42 +358,19 @@ const captureScreenshot = async () => {
   const toastId = toast.loading("Synthesizing Visual Log...");
 
   try {
-    // Advanced capture configuration to handle complex CSS
-    const canvas = await html2canvas(taskListRef.value, {
+    const dataUrl = await toPng(taskListRef.value, {
       backgroundColor: isDark.value ? "#0f172a" : "#f8fafc",
-      scale: 3,
-      logging: false,
-      useCORS: true,
-      allowTaint: true,
-      // The secret sauce: sanitize the DOM clone before rendering
-      onclone: (clonedDoc) => {
-        const clonedElement =
-          clonedDoc.querySelector('[ref="taskListRef"]') ||
-          clonedDoc.body.querySelector(".flex.flex-col.grow");
-
-        if (clonedElement) {
-          // Remove problematic backdrop filters and transitions
-          const allElements = clonedElement.querySelectorAll("*");
-          allElements.forEach((el) => {
-            const style = window.getComputedStyle(el);
-            if (style.backdropFilter !== "none") {
-              el.style.backdropFilter = "none";
-              el.style.webkitBackdropFilter = "none";
-              // Fallback background for blurred elements
-              el.style.backgroundColor = isDark.value
-                ? "rgba(30, 41, 59, 0.8)"
-                : "rgba(255, 255, 255, 0.9)";
-            }
-            el.style.transition = "none";
-            el.style.animation = "none";
-          });
-        }
+      cacheBust: true,
+      quality: 0.95,
+      pixelRatio: 2, // High resolution (Retina quality)
+      style: {
+        transform: "scale(1)", // Ensure no accidental scaling artifacts
       },
     });
 
     const link = document.createElement("a");
     link.download = `taskpilot-log-${new Date().getTime()}.png`;
-    link.href = canvas.toDataURL("image/png");
+    link.href = dataUrl;
     link.click();
 
     toast.success("Log Decrypted & Saved", { id: toastId });
@@ -429,23 +404,34 @@ const generateShareUrl = async () => {
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("Share failed:", err);
-        copyToClipboard(sharedUrl);
+        await copyToClipboard(sharedUrl);
       }
     }
   } else {
-    copyToClipboard(sharedUrl);
+    await copyToClipboard(sharedUrl);
   }
 };
 
-const copyToClipboard = (text) => {
-  navigator.clipboard.writeText(text);
-  isSharing.value = true;
-  toast.success("Network Synchronized", {
-    description: "Mission link copied to clipboard.",
-  });
-  setTimeout(() => {
-    isSharing.value = false;
-  }, 2000);
+const copyToClipboard = async (text) => {
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("Clipboard API unavailable");
+    }
+
+    await navigator.clipboard.writeText(text);
+    isSharing.value = true;
+    toast.success("Network Synchronized", {
+      description: "Mission link copied to clipboard.",
+    });
+    setTimeout(() => {
+      isSharing.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error("Clipboard write failed:", err);
+    toast.error("Network Sync Failed", {
+      description: "Couldn't copy the mission link on this device.",
+    });
+  }
 };
 
 const hydrateFromUrl = () => {
@@ -551,6 +537,7 @@ watch(tasks, saveTasks, { deep: true });
               variant="outline"
               size="icon"
               @click="toggleDark()"
+              aria-label="Toggle dark mode"
               class="rounded-full h-11 w-11 border-outline-variant/20 bg-surface-container-highest backdrop-blur-sm hover:bg-surface-container-highest/70 transition-all duration-300 shadow-sm shadow-primary/20 shrink-0"
             >
               <ph-moon
@@ -578,13 +565,15 @@ watch(tasks, saveTasks, { deep: true });
                 >
               </CardHeader>
               <CardContent class="p-2 space-y-1">
-                <div
+                <button
                   v-for="cat in categories"
                   :key="cat.name"
+                  type="button"
                   @click="currentCategory = cat.name"
+                  :aria-pressed="currentCategory === cat"
                   :class="
                     cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10 w-full',
                       currentCategory === cat.name
                         ? 'bg-primary/10 text-primary shadow-inner border border-primary/20'
                         : 'text-muted-foreground hover:bg-surface-container-high hover:text-foreground',
@@ -595,11 +584,11 @@ watch(tasks, saveTasks, { deep: true });
                   <span class="font-bold text-sm tracking-tight">{{
                     cat.name
                   }}</span>
-                  <div
+                  <span
                     v-if="currentCategory === cat.name"
                     class="absolute left-0 w-1 h-4 bg-primary rounded-r-full"
                   />
-                </div>
+                </button>
               </CardContent>
             </Card>
 
@@ -792,7 +781,11 @@ watch(tasks, saveTasks, { deep: true });
             <Card
               class="bg-surface-container-low dark:bg-surface-container-high/80 border border-border/50 shadow-sm overflow-hidden min-h-[400px] flex flex-col"
             >
-              <div ref="taskListRef" class="flex flex-col grow">
+              <div
+                ref="taskListRef"
+                id="task-pilot-capture-target"
+                class="flex flex-col grow"
+              >
                 <CardHeader
                   class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
                 >
@@ -921,7 +914,7 @@ watch(tasks, saveTasks, { deep: true });
                               v-else
                               :class="
                                 cn(
-                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-all leading-tight',
                                   task.isCompleted &&
                                     'line-through text-muted-foreground opacity-50',
                                 )
@@ -993,12 +986,7 @@ watch(tasks, saveTasks, { deep: true });
                             "
                           >
                             <ph-clock :size="12" />
-                            {{
-                              new Date(task.dueDate).toLocaleDateString(
-                                undefined,
-                                { month: "short", day: "numeric" },
-                              )
-                            }}
+                            {{ format(parseISO(task.dueDate), "MMM d") }}
                           </span>
                         </ItemDescription>
                       </div>
@@ -1011,6 +999,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label="Save changes"
                           class="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg transition-all"
                           @mousedown.prevent="saveEdit(task)"
                         >
@@ -1019,6 +1008,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label="Cancel editing"
                           class="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                           @mousedown.prevent="cancelEdit(task)"
                         >
@@ -1030,7 +1020,8 @@ watch(tasks, saveTasks, { deep: true });
                           v-if="!task.isCompleted"
                           variant="ghost"
                           size="icon"
-                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          aria-label="Edit mission"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 sm:group-focus-within:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                           @click="startEditing(task)"
                         >
                           <ph-pencil-simple-line :size="20" />
@@ -1038,7 +1029,8 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
-                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          aria-label="Delete mission"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 sm:group-focus-within:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                           @click="deleteTodo(task)"
                         >
                           <ph-trash :size="20" />
@@ -1052,12 +1044,12 @@ watch(tasks, saveTasks, { deep: true });
                   class="flex items-center justify-between p-6 pt-4 mt-auto border-t border-border/5"
                 >
                   <!-- DESKTOP BUTTONS -->
-                  <div class="hidden sm:flex gap-2">
+                  <div class="hidden sm:flex items-center gap-2">
                     <Button
                       @click="generateShareUrl"
-                      class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
+                      class="font-black text-[10px] uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                     >
-                      <template v-if="isSharing">
+                      <template v-if="isSharing" class="">
                         <ph-check-circle :size="18" weight="bold" />
                         Copied!
                       </template>
@@ -1070,7 +1062,7 @@ watch(tasks, saveTasks, { deep: true });
                     <Button
                       variant="outline"
                       @click="captureScreenshot"
-                      class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
+                      class="h-10 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                     >
                       <ph-camera :size="18" weight="bold" />
                       Screenshot
@@ -1083,6 +1075,7 @@ watch(tasks, saveTasks, { deep: true });
                       <TooltipTrigger asChild>
                         <Button
                           @click="generateShareUrl"
+                          aria-label="Share tasks"
                           class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                         >
                           <ph-share-network :size="18" weight="bold" />
@@ -1099,6 +1092,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="outline"
                           @click="captureScreenshot"
+                          aria-label="Take screenshot"
                           class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                         >
                           <ph-camera :size="18" />
@@ -1117,13 +1111,56 @@ watch(tasks, saveTasks, { deep: true });
                     @click="clearAll"
                     class="h-9 px-4 rounded-lg text-destructive font-headings font-black text-[10px] uppercase tracking-widest hover:text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
                   >
-                    Wipe Interface
+                    Clear All
                   </Button>
                 </CardFooter>
               </div>
             </Card>
           </main>
         </div>
+
+        <!-- DESIGNER SIGNATURE FOOTER -->
+        <footer
+          class="mt-16 mb-12 flex flex-col items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-300"
+        >
+          <div class="h-0.5 max-w-200 w-full bg-border/60 mb-8"></div>
+
+          <p class="group flex flex-col items-center gap-3">
+            <span
+              class="text-[11px] font-headings font-bold text-muted-foreground/80 uppercase tracking-[0.3em] transition-colors group-hover:text-muted-foreground/50"
+            >
+              Crafted with Excellence
+            </span>
+
+            <a
+              href="https://lawaloyinlola.com"
+              target="_blank"
+              class="relative flex items-center gap-3 px-6 py-2.5 rounded-full bg-surface-container-high/40 border border-border/40 hover:border-primary/40 hover:bg-surface-container-highest transition-all duration-500 hover:shadow-xl hover:shadow-primary/5 active:scale-95 group/link"
+            >
+              <ph-heart
+                :size="14"
+                weight="fill"
+                class="text-destructive/40 group-hover/link:text-destructive group-hover/link:scale-110 transition-all duration-500"
+              />
+
+              <span
+                class="text-xs font-headings font-black tracking-widest text-muted-foreground/70 group-hover/link:text-foreground transition-colors uppercase"
+              >
+                LAWAL
+              </span>
+
+              <div
+                class="h-1 w-1 rounded-full bg-primary/40 group-hover/link:bg-primary transition-colors"
+              ></div>
+            </a>
+          </p>
+
+          <div
+            class="mt-8 text-[9px] font-medium text-muted-foreground/40 uppercase tracking-[0.4em] pointer-events-none"
+          >
+            Est. 2023 • TaskPilot Engine
+          </div>
+        </footer>
       </div>
     </div>
   </TooltipProvider>
