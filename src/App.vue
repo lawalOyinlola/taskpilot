@@ -302,8 +302,8 @@ const deleteTodo = (task) => {
   const index = tasks.value.findIndex((t) => t.id === task.id);
   if (index === -1) return;
 
-  lastDeletedTask.value = { ...tasks.value[index] };
-  lastDeletedIndex.value = index;
+  const deletedTask = { ...tasks.value[index] };
+  const deletedIndex = index;
 
   tasks.value.splice(index, 1);
   saveTasks();
@@ -313,11 +313,9 @@ const deleteTodo = (task) => {
     action: {
       label: "Undo",
       onClick: () => {
-        if (lastDeletedTask.value) {
-          tasks.value.splice(lastDeletedIndex.value, 0, lastDeletedTask.value);
+        if (deletedTask) {
+          tasks.value.splice(deletedIndex, 0, deletedTask);
           saveTasks();
-          lastDeletedTask.value = null;
-          lastDeletedIndex.value = -1;
           toast.success("Mission Restored");
         }
       },
@@ -429,23 +427,34 @@ const generateShareUrl = async () => {
     } catch (err) {
       if (err.name !== "AbortError") {
         console.error("Share failed:", err);
-        copyToClipboard(sharedUrl);
+        await copyToClipboard(sharedUrl);
       }
     }
   } else {
-    copyToClipboard(sharedUrl);
+    await copyToClipboard(sharedUrl);
   }
 };
 
-const copyToClipboard = (text) => {
-  navigator.clipboard.writeText(text);
-  isSharing.value = true;
-  toast.success("Network Synchronized", {
-    description: "Mission link copied to clipboard.",
-  });
-  setTimeout(() => {
-    isSharing.value = false;
-  }, 2000);
+const copyToClipboard = async (text) => {
+  try {
+    if (!navigator.clipboard?.writeText) {
+      throw new Error("Clipboard API unavailable");
+    }
+
+    await navigator.clipboard.writeText(text);
+    isSharing.value = true;
+    toast.success("Network Synchronized", {
+      description: "Mission link copied to clipboard.",
+    });
+    setTimeout(() => {
+      isSharing.value = false;
+    }, 2000);
+  } catch (err) {
+    console.error("Clipboard write failed:", err);
+    toast.error("Network Sync Failed", {
+      description: "Couldn't copy the mission link on this device.",
+    });
+  }
 };
 
 const hydrateFromUrl = () => {
@@ -551,6 +560,7 @@ watch(tasks, saveTasks, { deep: true });
               variant="outline"
               size="icon"
               @click="toggleDark()"
+              aria-label="Toggle dark mode"
               class="rounded-full h-11 w-11 border-outline-variant/20 bg-surface-container-highest backdrop-blur-sm hover:bg-surface-container-highest/70 transition-all duration-300 shadow-sm shadow-primary/20 shrink-0"
             >
               <ph-moon
@@ -578,13 +588,15 @@ watch(tasks, saveTasks, { deep: true });
                 >
               </CardHeader>
               <CardContent class="p-2 space-y-1">
-                <div
+                <button
                   v-for="cat in categories"
                   :key="cat.name"
+                  type="button"
                   @click="currentCategory = cat.name"
+                  :aria-pressed="currentCategory === cat"
                   :class="
                     cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10',
+                      'flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all duration-300 group relative z-10 w-full',
                       currentCategory === cat.name
                         ? 'bg-primary/10 text-primary shadow-inner border border-primary/20'
                         : 'text-muted-foreground hover:bg-surface-container-high hover:text-foreground',
@@ -595,11 +607,11 @@ watch(tasks, saveTasks, { deep: true });
                   <span class="font-bold text-sm tracking-tight">{{
                     cat.name
                   }}</span>
-                  <div
+                  <span
                     v-if="currentCategory === cat.name"
                     class="absolute left-0 w-1 h-4 bg-primary rounded-r-full"
                   />
-                </div>
+                </button>
               </CardContent>
             </Card>
 
@@ -921,7 +933,7 @@ watch(tasks, saveTasks, { deep: true });
                               v-else
                               :class="
                                 cn(
-                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-words leading-tight',
+                                  'text-base font-headings font-bold transition-all duration-300 text-foreground whitespace-pre-wrap break-all leading-tight',
                                   task.isCompleted &&
                                     'line-through text-muted-foreground opacity-50',
                                 )
@@ -993,12 +1005,7 @@ watch(tasks, saveTasks, { deep: true });
                             "
                           >
                             <ph-clock :size="12" />
-                            {{
-                              new Date(task.dueDate).toLocaleDateString(
-                                undefined,
-                                { month: "short", day: "numeric" },
-                              )
-                            }}
+                            {{ format(parseISO(task.dueDate), "MMM d") }}
                           </span>
                         </ItemDescription>
                       </div>
@@ -1011,6 +1018,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label="Save changes"
                           class="h-8 w-8 text-primary hover:bg-primary/10 rounded-lg transition-all"
                           @mousedown.prevent="saveEdit(task)"
                         >
@@ -1019,6 +1027,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
+                          aria-label="Cancel editing"
                           class="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                           @mousedown.prevent="cancelEdit(task)"
                         >
@@ -1030,7 +1039,8 @@ watch(tasks, saveTasks, { deep: true });
                           v-if="!task.isCompleted"
                           variant="ghost"
                           size="icon"
-                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                          aria-label="Edit mission"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 sm:group-focus-within:opacity-100 h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
                           @click="startEditing(task)"
                         >
                           <ph-pencil-simple-line :size="20" />
@@ -1038,7 +1048,8 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="ghost"
                           size="icon"
-                          class="sm:opacity-0 sm:group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
+                          aria-label="Delete mission"
+                          class="sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 sm:group-focus-within:opacity-100 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-all"
                           @click="deleteTodo(task)"
                         >
                           <ph-trash :size="20" />
@@ -1083,6 +1094,7 @@ watch(tasks, saveTasks, { deep: true });
                       <TooltipTrigger asChild>
                         <Button
                           @click="generateShareUrl"
+                          aria-label="Share tasks"
                           class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
                         >
                           <ph-share-network :size="18" weight="bold" />
@@ -1099,6 +1111,7 @@ watch(tasks, saveTasks, { deep: true });
                         <Button
                           variant="outline"
                           @click="captureScreenshot"
+                          aria-label="Take screenshot"
                           class="h-9 px-5 text-muted-foreground/60 hover:text-foreground hover:bg-surface-container-highest active:scale-95 transition-all font-black text-[10px] uppercase tracking-wider"
                         >
                           <ph-camera :size="18" />
