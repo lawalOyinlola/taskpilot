@@ -29,8 +29,14 @@ import {
 } from "@/components/ui/input-group";
 
 const props = defineProps({
-  categories: Array,
-  priorities: Array,
+  categories: {
+    type: Array,
+    required: true,
+  },
+  priorities: {
+    type: Array,
+    required: true,
+  },
 });
 
 const emit = defineEmits(["add-task"]);

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, watchEffect } from "vue";
 import { useDark, useToggle } from "@vueuse/core";
 import { addDays, format } from "date-fns";
 import autoAnimate from "@formkit/auto-animate";
@@ -363,8 +363,10 @@ const hydrateFromUrl = () => {
 onMounted(() => {
   loadTasks();
   hydrateFromUrl();
-  const el = taskListRef.value?.taskListRef;
-  if (el) autoAnimate(el);
+  watchEffect(() => {
+    const el = taskListRef.value?.taskListRef;
+    if (el) autoAnimate(el);
+  });
 });
 
 // Theme Toggle Setup
@@ -382,30 +384,27 @@ watch(tasks, saveTasks, { deep: true });
     >
       <Toaster position="bottom-right" richColors closeButton />
       <div class="max-w-5xl mx-auto w-full overflow-hidden">
-        
-        <AppHeader 
+        <AppHeader
           v-model:search-query="searchQuery"
           :is-dark="isDark"
           @toggle-dark="toggleDark()"
         />
 
         <div class="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-8">
-          
-          <AppSidebar 
+          <AppSidebar
             :categories="categories"
             v-model:current-category="currentCategory"
             :stats="stats"
           />
 
           <main class="space-y-6 order-first lg:order-last">
-            
-            <AddTask 
+            <AddTask
               :categories="categories"
               :priorities="priorities"
               @add-task="handleAddTask"
             />
 
-            <TaskList 
+            <TaskList
               ref="taskListRef"
               :tasks="tasks"
               :filtered-tasks="filteredTasks"

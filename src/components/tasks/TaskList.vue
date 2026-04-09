@@ -39,6 +39,8 @@ const props = defineProps({
   getCategoryIcon: { type: Function, required: true },
 });
 
+const FILTER_OPTIONS = ["all", "active", "completed", "expired"];
+
 const emit = defineEmits([
   "update:currentCategory",
   "update:currentFilter",
@@ -80,7 +82,7 @@ defineExpose({
           class="hidden sm:flex gap-0.5 bg-surface-container-highest/50 rounded-xl p-1 shadow-sm shadow-primary/20"
         >
           <Button
-            v-for="filter in ['all', 'active', 'completed', 'expired']"
+            v-for="filter in FILTER_OPTIONS"
             :key="filter"
             variant="ghost"
             size="sm"
@@ -133,11 +135,7 @@ defineExpose({
             <SelectContent
               class="bg-surface-container-highest border-outline-variant/10"
             >
-              <SelectItem
-                v-for="f in ['all', 'active', 'completed', 'expired']"
-                :key="f"
-                :value="f"
-              >
+              <SelectItem v-for="f in FILTER_OPTIONS" :key="f" :value="f">
                 {{ f.toUpperCase() }}
               </SelectItem>
             </SelectContent>

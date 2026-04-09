@@ -4,9 +4,19 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
 defineProps({
-  categories: Array,
-  currentCategory: String,
-  stats: Object,
+  categories: {
+    type: Array,
+    required: true,
+  },
+  currentCategory: {
+    type: String,
+    required: true,
+  },
+  stats: {
+    type: Object,
+    required: true,
+    validator: (v) => "percentage" in v && "completed" in v && "total" in v,
+  },
 });
 
 defineEmits(["update:currentCategory"]);

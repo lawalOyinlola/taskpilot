@@ -2,9 +2,8 @@ import { isPast, endOfDay, parseISO, isToday } from "date-fns";
 
 export const isTaskExpired = (task) => {
   if (!task.dueDate || task.isCompleted) return false;
-  return (
-    isPast(endOfDay(parseISO(task.dueDate))) && !isToday(parseISO(task.dueDate))
-  );
+  const dueDate = parseISO(task.dueDate);
+  return isPast(endOfDay(dueDate)) && !isToday(dueDate);
 };
 
 export const getTaskStatus = (task) => {

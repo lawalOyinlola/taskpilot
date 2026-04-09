@@ -1,9 +1,5 @@
 <script setup>
 import { PhHeart } from "@phosphor-icons/vue";
-
-defineProps({
-  // No props needed currently
-});
 </script>
 
 <template>
