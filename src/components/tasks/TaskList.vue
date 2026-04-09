@@ -30,13 +30,13 @@ import {
 import TaskItem from "./TaskItem.vue";
 
 const props = defineProps({
-  tasks: Array,
-  filteredTasks: Array,
-  currentCategory: String,
-  currentFilter: String,
-  categories: Array,
-  isSharing: Boolean,
-  getCategoryIcon: Function,
+  tasks: { type: Array, default: () => [] },
+  filteredTasks: { type: Array, default: () => [] },
+  currentCategory: { type: String, default: "all" },
+  currentFilter: { type: String, default: "all" },
+  categories: { type: Array, default: () => [] },
+  isSharing: { type: Boolean, default: false },
+  getCategoryIcon: { type: Function, required: true },
 });
 
 const emit = defineEmits([
