@@ -208,7 +208,7 @@ const handleAddTask = () => {
             <InputGroupButton
               @click="handleAddTask"
               :disabled="!newTodoInput.trim()"
-              class="h-8! px-4! w-full sm:w-auto font-black text-[10px] uppercase tracking-wider shadow-lg shadow-primary/20 active:scale-95 transition-al"
+              class="h-8! px-4! w-full sm:w-auto font-black text-[10px] uppercase tracking-wider shadow-lg shadow-primary/20 active:scale-95 transition-all"
             >
               Launch
               <ph-paper-plane-right weight="bold" class="size-3!" />
