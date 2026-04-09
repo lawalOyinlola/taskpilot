@@ -1,11 +1,6 @@
 <script setup>
 import { cn } from "@/lib/utils";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
 defineProps({
@@ -55,10 +50,8 @@ defineEmits(["update:currentCategory"]);
       </CardContent>
     </Card>
 
-    <!-- MISION PROGRESS CARD -->
-    <Card
-      class="bg-surface-container-low border border-border/50 shadow-sm"
-    >
+    <!-- MISSION PROGRESS CARD -->
+    <Card class="bg-surface-container-low border border-border/50 shadow-sm">
       <CardHeader class="pb-2">
         <CardTitle
           class="text-[10px] text-center font-headings font-black uppercase tracking-[0.2em] text-primary/60"
@@ -66,9 +59,7 @@ defineEmits(["update:currentCategory"]);
         >
       </CardHeader>
       <CardContent class="text-center p-6 pt-2 relative z-10">
-        <div
-          class="text-4xl font-headings font-black text-primary mb-1"
-        >
+        <div class="text-4xl font-headings font-black text-primary mb-1">
           {{ stats.percentage }}%
         </div>
         <div
