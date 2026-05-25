@@ -12,7 +12,7 @@ TaskPilot is a high-performance, premium operational task tracker and mission co
 - **🌙 Nocturnal & Diurnal Themes**: Smooth dark and light mode transitions powered by `@vueuse/core`.
 - **⚡ Dynamic Fluid Motion**: Micro-animations and automatic list transitions powered by `@formkit/auto-animate`.
 - **📊 Operational Analytics**: An adaptive sidebar showing task statistics, completion percentages, and filtered category counts.
-- **🏷️ Structured Organization**: Categorize tasks by *General*, *Work*, *Personal*, *Automation*, and *Health* with corresponding custom iconography and priority highlights (*High*, *Medium*, *Low*).
+- **🏷️ Structured Organization**: Categorize tasks by _General_, _Work_, _Personal_, _Automation_, and _Health_ with corresponding custom iconography and priority highlights (_High_, _Medium_, _Low_).
 
 ---
 
@@ -42,6 +42,12 @@ Ensure you have [Node.js](https://nodejs.org/) installed (v18+ recommended) and 
 Clone the repository and install the project dependencies:
 
 ```bash
+# Clone the repository
+git clone https://github.com/lawalOyinlola/taskpilot.git
+
+# Navigate into the project directory
+cd taskpilot
+
 # Install dependencies
 pnpm install
 ```
@@ -72,9 +78,10 @@ pnpm preview
 
 ## 🎨 Design Systems
 
-TaskPilot implements a dual-theme color palette driven by CSS variables in [index.css](file:///Users/honeyzrich/Desktop/projects/taskpilot/src/assets/index.css):
+TaskPilot implements a dual-theme color palette driven by CSS variables in [`src/assets/index.css`](src/assets/index.css):
 
 ### ☀️ Aero Command (Light Mode)
+
 Designed for high readability in professional environments using a soft slate background layered with pure white surface cards.
 
 - **Background**: `hsl(210 40% 98%)` (Slate-50)
@@ -82,6 +89,7 @@ Designed for high readability in professional environments using a soft slate ba
 - **Success**: `hsl(160 84% 39%)` (Tactical Green)
 
 ### 🌙 Nocturnal Navigator (Dark Mode)
+
 A custom night-ops palette with deep slate tones, neon accents, and soft glow overlays.
 
 - **Background**: `hsl(222 55% 10%)`
