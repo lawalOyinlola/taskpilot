@@ -34,6 +34,7 @@ const props = defineProps({
   filteredTasks: { type: Array, default: () => [] },
   currentCategory: { type: String, default: "all" },
   currentFilter: { type: String, default: "all" },
+  currentSort: { type: String, default: "newest" },
   categories: { type: Array, default: () => [] },
   isSharing: { type: Boolean, default: false },
   getCategoryIcon: { type: Function, required: true },
@@ -44,6 +45,7 @@ const FILTER_OPTIONS = ["all", "active", "completed", "expired"];
 const emit = defineEmits([
   "update:currentCategory",
   "update:currentFilter",
+  "update:currentSort",
   "toggle-status",
   "delete-task",
   "save-edit",
@@ -55,6 +57,17 @@ const emit = defineEmits([
 ]);
 
 const taskListRef = ref(null);
+
+const SORT_OPTIONS = [
+  { id: "priority_desc", label: "Priority: High-Low" },
+  { id: "priority_asc", label: "Priority: Low-High" },
+  { id: "date_asc", label: "Date: Nearest First" },
+  { id: "date_desc", label: "Date: Furthest First" },
+  { id: "name_asc", label: "Name: A to Z" },
+  { id: "name_desc", label: "Name: Z to A" },
+  { id: "newest", label: "Created: Newest" },
+  { id: "oldest", label: "Created: Oldest" },
+];
 
 defineExpose({
   taskListRef,
@@ -73,7 +86,9 @@ defineExpose({
       <CardHeader
         class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-6"
       >
-        <CardTitle class="text-xl font-headings font-extrabold tracking-tight">
+        <CardTitle
+          class="text-xl font-headings font-extrabold tracking-tight mr-auto"
+        >
           Mission Feed:
           <span class="text-primary ml-1">{{ currentCategory }}</span>
         </CardTitle>
@@ -89,7 +104,7 @@ defineExpose({
             @click="emit('update:currentFilter', filter)"
             :class="
               cn(
-                'h-7.5 px-2.5 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
+                'h-7 px-2.5 text-[10px] font-headings font-black uppercase tracking-widest transition-all duration-300',
                 currentFilter === filter
                   ? 'bg-primary text-primary-foreground rounded-lg'
                   : 'text-muted-foreground/60 hover:text-foreground hover:bg-primary/20',
@@ -100,23 +115,51 @@ defineExpose({
           </Button>
         </div>
 
-        <div class="sm:hidden flex flex-row items-center gap-2 w-full">
+        <div class="hidden sm:block min-w-[120px]">
+          <Select
+            :model-value="currentSort"
+            @update:model-value="emit('update:currentSort', $event)"
+          >
+            <SelectTrigger
+              class="h-8 bg-surface-container-highest/50 border-outline-variant/10 font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all"
+            >
+              <SelectValue>
+                {{ SORT_OPTIONS.find((s) => s.id === currentSort)?.label }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              class="bg-surface-container-highest border-outline-variant/10 backdrop-blur-xl"
+            >
+              <SelectItem
+                v-for="s in SORT_OPTIONS"
+                :key="s.id"
+                :value="s.id"
+                class="font-black text-[10px] uppercase tracking-wider"
+              >
+                {{ s.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div class="sm:hidden flex flex-col gap-2 w-full">
           <Select
             :model-value="currentCategory"
             @update:model-value="emit('update:currentCategory', $event)"
           >
             <SelectTrigger
-              class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+              class="h-9 bg-surface-container-highest/50 border-outline-variant/10 font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all"
             >
-              <SelectValue :placeholder="currentCategory" />
+              <SelectValue> Sector: {{ currentCategory }} </SelectValue>
             </SelectTrigger>
             <SelectContent
-              class="bg-surface-container-highest border-outline-variant/10"
+              class="bg-surface-container-highest border-outline-variant/10 backdrop-blur-xl"
             >
               <SelectItem
                 v-for="cat in categories"
                 :key="cat.name"
                 :value="cat.name"
+                class="font-black text-[10px] uppercase tracking-wider"
               >
                 {{ cat.name }}
               </SelectItem>
@@ -128,15 +171,52 @@ defineExpose({
             @update:model-value="emit('update:currentFilter', $event)"
           >
             <SelectTrigger
-              class="h-9 bg-surface-container-highest/50 border-outline-variant/10 text-[10px] font-black uppercase tracking-widest"
+              class="h-9 bg-surface-container-highest/50 border-outline-variant/10 font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all"
             >
-              <SelectValue :placeholder="currentFilter" />
+              <SelectValue>
+                Status:
+                {{
+                  currentFilter === "completed"
+                    ? "Done"
+                    : currentFilter.toUpperCase()
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent
-              class="bg-surface-container-highest border-outline-variant/10"
+              class="bg-surface-container-highest border-outline-variant/10 backdrop-blur-xl"
             >
-              <SelectItem v-for="f in FILTER_OPTIONS" :key="f" :value="f">
-                {{ f.toUpperCase() }}
+              <SelectItem
+                v-for="f in FILTER_OPTIONS"
+                :key="f"
+                :value="f"
+                class="font-black text-[10px] uppercase tracking-wider"
+              >
+                {{ f === "completed" ? "DONE" : f.toUpperCase() }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select
+            :model-value="currentSort"
+            @update:model-value="emit('update:currentSort', $event)"
+          >
+            <SelectTrigger
+              class="h-9 bg-surface-container-highest/50 border-outline-variant/10 font-black text-[10px] uppercase tracking-wider active:scale-95 transition-all"
+            >
+              <SelectValue>
+                {{ SORT_OPTIONS.find((s) => s.id === currentSort)?.label }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent
+              class="bg-surface-container-highest border-outline-variant/10 backdrop-blur-xl"
+            >
+              <SelectItem
+                v-for="s in SORT_OPTIONS"
+                :key="s.id"
+                :value="s.id"
+                class="font-black text-[10px] uppercase tracking-wider"
+              >
+                {{ s.label }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -202,16 +282,21 @@ defineExpose({
             <TooltipTrigger asChild>
               <Button
                 @click="emit('share')"
-                aria-label="Share tasks"
+                :aria-label="isSharing ? 'Copied' : 'Share tasks'"
                 class="font-black uppercase tracking-wider h-9 px-5 active:scale-95 shadow-lg shadow-primary/10 transition-all"
               >
-                <ph-share-network :size="18" weight="bold" />
+                <ph-check-circle v-if="isSharing" :size="18" weight="bold" />
+                <ph-share-network v-else :size="18" weight="bold" />
               </Button>
             </TooltipTrigger>
             <TooltipContent
               class="bg-primary text-primary-foreground border-none font-bold text-xs"
             >
-              Share Task{{ filteredTasks.length > 1 ? "s" : "" }}
+              {{
+                isSharing
+                  ? "Copied!"
+                  : `Share Task${filteredTasks.length > 1 ? "s" : ""}`
+              }}
             </TooltipContent>
           </Tooltip>
           <Tooltip>

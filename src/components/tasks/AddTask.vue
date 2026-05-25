@@ -63,10 +63,11 @@ const handleDateUpdate = (val) => {
 };
 
 const handleAddTask = () => {
-  if (!newTodoInput.value.trim()) return;
+  const trimmedName = newTodoInput.value.trim();
+  if (!trimmedName) return;
 
   emit("add-task", {
-    name: newTodoInput.value,
+    name: trimmedName,
     priority: newTodoPriority.value,
     category: newTodoCategory.value,
     dueDate: newTodoDueDate.value,
@@ -77,6 +78,7 @@ const handleAddTask = () => {
   newTodoPriority.value = null;
   newTodoCategory.value = null;
   newTodoDueDate.value = null;
+  calendarPlaceholder.value = today(getLocalTimeZone());
 };
 </script>
 
@@ -130,7 +132,7 @@ const handleAddTask = () => {
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
                   <SelectContent
-                    class="bg-surface-container-highest border-outline-variant/10 text-foreground rounded-xl backdrop-blur-xl"
+                    class="bg-surface-container-highest border-outline-variant/10 text-foreground backdrop-blur-xl"
                   >
                     <SelectItem
                       v-for="p in priorities"
@@ -159,7 +161,7 @@ const handleAddTask = () => {
                     <SelectValue placeholder="Sector" />
                   </SelectTrigger>
                   <SelectContent
-                    class="bg-surface-container-highest border-outline-variant/10 text-foreground rounded-xl backdrop-blur-xl"
+                    class="bg-surface-container-highest border-outline-variant/10 text-foreground backdrop-blur-xl"
                   >
                     <SelectItem
                       v-for="c in categories.filter(
@@ -167,7 +169,7 @@ const handleAddTask = () => {
                       )"
                       :key="c.name"
                       :value="c.name"
-                      class="text-xs font-bold"
+                      class="text-xs font-headings font-bold uppercase"
                     >
                       {{ c.name }}
                     </SelectItem>

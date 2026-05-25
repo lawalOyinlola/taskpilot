@@ -34,6 +34,7 @@ const tasks = ref([]);
 const currentFilter = ref("all");
 const currentCategory = ref("All");
 const searchQuery = ref("");
+const currentSort = ref("priority_desc");
 const isSharing = ref(false);
 const taskListRef = ref(null);
 
@@ -79,8 +80,36 @@ const filteredTasks = computed(() => {
   }
 
   return result.sort((a, b) => {
-    const pMap = { high: 0, med: 1, low: 2 };
-    return pMap[a.priority] - pMap[b.priority];
+    switch (currentSort.value) {
+      case "priority_desc": {
+        const pMap = { high: 0, med: 1, low: 2 };
+        if (pMap[a.priority] !== pMap[b.priority]) {
+          return pMap[a.priority] - pMap[b.priority];
+        }
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      }
+      case "priority_asc": {
+        const pMap = { high: 0, med: 1, low: 2 };
+        if (pMap[a.priority] !== pMap[b.priority]) {
+          return pMap[b.priority] - pMap[a.priority];
+        }
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      }
+      case "date_asc":
+        return new Date(a.dueDate) - new Date(b.dueDate);
+      case "date_desc":
+        return new Date(b.dueDate) - new Date(a.dueDate);
+      case "name_asc":
+        return a.name.localeCompare(b.name);
+      case "name_desc":
+        return b.name.localeCompare(a.name);
+      case "newest":
+        return (b.id || 0) - (a.id || 0);
+      case "oldest":
+        return (a.id || 0) - (b.id || 0);
+      default:
+        return 0;
+    }
   });
 });
 
@@ -161,6 +190,7 @@ const startEditing = (task) => {
 
 const saveEdit = (task) => {
   if (!task.isEditing) return;
+  task.name = task.name.trim();
   task.isEditing = false;
   saveTasks();
   toast.success("Mission Updated", {
@@ -174,11 +204,14 @@ const cancelEdit = (task) => {
 };
 
 const handleAddTask = (taskData) => {
+  const trimmedName = taskData.name.trim();
+  if (!trimmedName) return;
+
   const defaultDate = format(addDays(new Date(), 7), "yyyy-MM-dd");
 
   tasks.value.unshift({
     id: Date.now(),
-    name: taskData.name,
+    name: trimmedName,
     priority: taskData.priority ?? "med",
     category:
       !taskData.category || taskData.category === "All"
@@ -408,8 +441,9 @@ watch(tasks, saveTasks, { deep: true });
               ref="taskListRef"
               :tasks="tasks"
               :filtered-tasks="filteredTasks"
-              v-model:current-category="currentCategory"
               v-model:current-filter="currentFilter"
+              v-model:current-category="currentCategory"
+              v-model:current-sort="currentSort"
               :categories="categories"
               :is-sharing="isSharing"
               :get-category-icon="getCategoryIcon"
